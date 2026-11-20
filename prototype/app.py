@@ -486,6 +486,19 @@ def _twilio_ready():
     return _TWILIO_CHECK["ok"], _TWILIO_CHECK["detail"]
 
 
+def _reader_ready():
+    """Configuration only: never calls the model from a probe. Always ok: without a reader the rules run and the
+    driver gets a clarifying question, so a misconfigured reader must not fail readiness (or trigger a rollback)."""
+    backend = getattr(LLM, "backend", None)
+    if backend == "agentcore":
+        return True, "agentcore (arn set)"
+    if backend:
+        return True, backend
+    if SETTINGS.reader == "agentcore":
+        return True, "rules only: READER=agentcore but AGENTCORE_READER_ARN, AWS_REGION or boto3 is missing"
+    return True, "rules only"
+
+
 @app.get("/readyz")
 def readyz():
     checks = {}
@@ -501,6 +514,7 @@ def readyz():
     except Exception as e:
         checks["redis"] = (False, type(e).__name__)
     checks["twilio"] = _twilio_ready()
+    checks["reader"] = _reader_ready()
     ok = all(v[0] for v in checks.values())
     body = {"ok": ok, "checks": {k: {"ok": v[0], "detail": v[1]} for k, v in checks.items()}, **CLOCK.describe(),
             "settings": SETTINGS.public()}

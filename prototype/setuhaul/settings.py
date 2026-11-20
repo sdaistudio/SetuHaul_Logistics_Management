@@ -1,6 +1,6 @@
 """Deployment settings from the environment (never from code or the repository).
 
-Secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, ANTHROPIC_API_KEY. They are read here,
+Secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, ANTHROPIC_API_KEY, SETUHAUL_SESSION_SALT. They are read here,
 used by the adapters, and never logged or traced (see tracing.mask and Settings.public()).
 """
 import os
@@ -30,6 +30,10 @@ class Settings:
     redis_url: str = ""
     duty_head_phone: str = ""
     worker: bool = True
+    reader: str = ""                               # READER: off | anthropic | agentcore; unset = ANTHROPIC_API_KEY decides
+    agentcore_reader_arn: str = ""                 # AGENTCORE_READER_ARN (shown only as set / not set)
+    aws_region: str = ""                           # AWS_REGION
+    session_salt: str = ""                         # SETUHAUL_SESSION_SALT (salts the AgentCore session id; never shown)
 
     @classmethod
     def from_env(cls, env=None):
@@ -51,6 +55,10 @@ class Settings:
             redis_url=e.get("REDIS_URL", ""),
             duty_head_phone=e.get("DUTY_HEAD_PHONE", ""),
             worker=_b(e.get("OUTBOX_WORKER"), True),
+            reader=(e.get("READER") or "").strip().lower(),
+            agentcore_reader_arn=e.get("AGENTCORE_READER_ARN", ""),
+            aws_region=e.get("AWS_REGION", ""),
+            session_salt=e.get("SETUHAUL_SESSION_SALT", ""),
         )
 
     def public(self):
@@ -60,4 +68,5 @@ class Settings:
                 "twilio_from": mask(self.twilio_whatsapp_from), "account_sid_set": bool(self.twilio_account_sid),
                 "auth_token_set": bool(self.twilio_auth_token), "webhook_base_url": self.twilio_webhook_base_url,
                 "content_sids": sorted(self.content_sids), "template_sids": sorted(self.template_sids),
-                "clock_mode": self.clock_mode}
+                "clock_mode": self.clock_mode,
+                "reader": self.reader or "default", "agentcore_arn_set": bool(self.agentcore_reader_arn)}

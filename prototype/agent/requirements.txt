@@ -1,0 +1,5 @@
+# AgentCore reader agent (agent/main.py). Versions are the ones tests/test_agentcore_reader.py ran with.
+bedrock-agentcore==1.26.1
+langchain-aws==1.10.0
+langchain-core==1.8.4
+langsmith==0.15.1
