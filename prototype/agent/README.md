@@ -81,6 +81,10 @@ Then:
    {"Effect": "Allow", "Action": "bedrock-agentcore:InvokeAgentRuntime",
     "Resource": ["<runtime ARN>", "<runtime ARN>/*"]}
    ```
+   The app runs **inside Docker**, so it reaches the instance role through IMDSv2 one network hop further away.
+   `deploy/aws/launch_instance.sh` sets `HttpPutResponseHopLimit=1`, and with that boto3 in the container gets
+   **no credentials**. Raise the limit to 2 once:
+   `aws ec2 modify-instance-metadata-options --instance-id <id> --http-tokens required --http-put-response-hop-limit 2`
 5. **Turn it on, on EC2:** `READER=agentcore`, `AGENTCORE_READER_ARN=<arn>`, `AWS_REGION=<region>`,
    `SETUHAUL_SESSION_SALT=<random string, keep it in SSM>`. Then redeploy (`deploy/server/update.sh`).
 6. **Check it:**

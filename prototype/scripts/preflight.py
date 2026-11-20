@@ -13,6 +13,7 @@ Checks, each PASS / WARN / FAIL:
   stores    the database opens; Redis answers PING if REDIS_URL is set
   clock     CLOCK_MODE and SNAPSHOT_ANCHOR parse
   phones    every mapped demo number is E.164 and unique; which scenarios the mapped handsets can play
+  reader    READER=agentcore: ARN and region present and well-formed, and a boto3 client can be built (no call is made)
 Exit code 1 if anything FAILs.
 """
 import argparse
@@ -40,7 +41,8 @@ REQUIRED = {"twilio": ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSA
             "sim": ["TWILIO_AUTH_TOKEN", "CLOCK_MODE"], "console": ["CLOCK_MODE"]}
 OPTIONAL = ["SNAPSHOT_ANCHOR", "TWILIO_INTERACTIVE", "TWILIO_SANDBOX", "REDIS_URL", "DUTY_HEAD_PHONE", "SETUHAUL_DEV",
             "TWILIO_CONTENT_QR1", "TWILIO_CONTENT_QR2", "TWILIO_CONTENT_QR3", "TWILIO_TPL_DRIVER_CHECKIN_SID",
-            "TWILIO_TPL_DRIVER_BOOKING_UPDATE_SID", "TWILIO_TPL_STAFF_PAGE_SID", "ANTHROPIC_API_KEY"]
+            "TWILIO_TPL_DRIVER_BOOKING_UPDATE_SID", "TWILIO_TPL_STAFF_PAGE_SID", "ANTHROPIC_API_KEY",
+            "READER", "AGENTCORE_READER_ARN", "AWS_REGION", "SETUHAUL_SESSION_SALT"]
 
 
 class Report:
@@ -243,6 +245,37 @@ def check_phones(env, rep):
     return playable
 
 
+def check_reader(env, rep):
+    reader = (env.get("READER") or "").strip().lower()
+    if reader in ("", "anthropic"):
+        rep.ok("reader", "LLM reader: " + ("Anthropic (direct)" if env.get("ANTHROPIC_API_KEY") else "none, rules only"))
+        return
+    if reader == "off":
+        rep.ok("reader", "READER=off: rules only")
+        return
+    if reader != "agentcore":
+        rep.fail("reader", "READER must be off, anthropic or agentcore")
+        return
+    arn, region = env.get("AGENTCORE_READER_ARN", ""), env.get("AWS_REGION", "")
+    if not arn or not region:
+        rep.fail("reader", "READER=agentcore needs AGENTCORE_READER_ARN and AWS_REGION")
+        return
+    if not re.match(r"^arn:aws[a-z-]*:bedrock-agentcore:[a-z0-9-]+:\d{12}:runtime/", arn):
+        rep.fail("reader", "AGENTCORE_READER_ARN does not look like an AgentCore runtime ARN")
+    elif f":{region}:" not in arn:
+        rep.warn("reader", "AGENTCORE_READER_ARN is in a different region from AWS_REGION")
+    if not env.get("SETUHAUL_SESSION_SALT"):
+        rep.warn("reader", "SETUHAUL_SESSION_SALT not set: AgentCore session ids are unsalted hashes of the driver id")
+    try:
+        import boto3
+        boto3.client("bedrock-agentcore", region_name=region)
+        rep.ok("reader", "AgentCore reader configured; boto3 client builds (no call made)")
+    except ImportError:
+        rep.fail("reader", "READER=agentcore but boto3 is not installed (pip install -r requirements-prod.txt)")
+    except Exception as e:
+        rep.fail("reader", f"boto3 client for bedrock-agentcore failed ({type(e).__name__})")
+
+
 def check_twilio_api(env, rep):
     try:
         from twilio.rest import Client
@@ -263,6 +296,7 @@ def run(env, do_probe=True, twilio_api=False):
     check_stores(env, rep)
     check_clock(env, rep)
     check_phones(env, rep)
+    check_reader(env, rep)
     if twilio_api and env.get("TWILIO_ACCOUNT_SID") and env.get("TWILIO_AUTH_TOKEN"):
         check_twilio_api(env, rep)
     return rep

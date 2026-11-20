@@ -44,6 +44,8 @@ Every run works on a fresh copy of `data/setuhaul_freight_operations.db`; the su
 | `setuhaul/graph.py` | The same turn as a LangGraph `StateGraph` (verify, dedupe, read, safety, dispatch) |
 | `setuhaul/session_store.py` | Sessions, tokens, history, dedupe, per-driver lock, rate limit: Redis, or in memory |
 | `setuhaul/llm.py` | Optional LLM fallback reader: Claude Haiku via LangChain, strict JSON, checked in code |
+| `setuhaul/reader_contract.py` | Schema, system prompt and payload rules shared with the AgentCore agent |
+| `agent/` | `setuhaul-reader`, the AgentCore Runtime agent that hosts only the model call (`READER=agentcore`) |
 | `setuhaul/auth.py` | Driver identity from the signed WhatsApp webhook; coordinator sign-in (Cognito, or demo tokens) |
 | `setuhaul/tracing.py` | LangSmith tracing with phone numbers masked and guardrail tags |
 | `tests/test_production_layer.py` | 24 tests for the production layer (no network, no keys needed) |
@@ -88,6 +90,9 @@ curl -s localhost:8000/console/holds -H "Authorization: Bearer <token>"
 |---|---|
 | `REDIS_URL` | Sessions in Redis; in memory if unset |
 | `ANTHROPIC_API_KEY` | Turns on the LLM fallback (only for messages the rules mark UNKNOWN); rules only if unset |
+| `READER` | Which LLM reader: `off` (rules only), `anthropic` (direct, needs `ANTHROPIC_API_KEY`), `agentcore` (Bedrock AgentCore Runtime, `agent/README.md`). Unset: as before |
+| `AGENTCORE_READER_ARN`, `AWS_REGION` | The `setuhaul-reader` runtime for `READER=agentcore`; `/readyz` shows only whether the ARN is set |
+| `SETUHAUL_SESSION_SALT` | Salts the AgentCore session id (hash of driver id + date); keep it in a secret store |
 | `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` | One trace per driver turn, phone numbers masked |
 | `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` | Live WhatsApp Cloud API |
 | `COGNITO_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` | Coordinator sign-in with Cognito instead of demo tokens |

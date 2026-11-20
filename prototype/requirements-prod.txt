@@ -12,3 +12,4 @@ PyJWT[crypto]==2.15.0     # auth.py, Cognito token check (production)
 fakeredis==2.40.0         # tests only
 twilio==9.13.0            # channels/twilio_wa.py: REST client, RequestValidator (signature check)
 PyYAML==6.0.3             # templates.py: templates/twilio_templates.yaml
+boto3==1.44.7             # llm.py AgentCoreFallback (READER=agentcore): invoke_agent_runtime
