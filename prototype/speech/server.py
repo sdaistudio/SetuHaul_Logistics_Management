@@ -11,7 +11,7 @@ on the model page with the account whose HF_TOKEN is used):
     STT English + "auto"  openai/whisper-small                           MIT     English transcripts and language ID
     TTS                   ai4bharat/indic-parler-tts                     Apache-2.0  hi, gu, mr, en (pa supported, unofficial)
 
-Marwari has no model of its own: the app sends hi-IN for it (setuhaul/voice.py SPEECH_LANG).
+Marwari has no model of its own: the app sends hi-IN for it (setuhaul/voice/base.py SPEECH_LANG).
 
 Status: written against the model cards' published usage; NOT run in the build environment (the models
 are gated and need a GPU). Run the smoke test in README.md on the target box before switching VOICE=selfhosted.

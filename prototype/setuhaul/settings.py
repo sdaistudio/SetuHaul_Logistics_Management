@@ -34,7 +34,7 @@ class Settings:
     agentcore_reader_arn: str = ""                 # AGENTCORE_READER_ARN (shown only as set / not set)
     aws_region: str = ""                           # AWS_REGION
     session_salt: str = ""                         # SETUHAUL_SESSION_SALT (salts the AgentCore session id; never shown)
-    voice: str = "off"                            # off | sarvam | selfhosted (speech models, see voice.py)
+    voice: str = "off"                            # off | openrouter | sarvam | selfhosted (see setuhaul/voice/)
     media_base_url: str = ""                      # public base WhatsApp fetches spoken replies from; default webhook base
 
     @classmethod

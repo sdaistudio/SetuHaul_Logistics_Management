@@ -218,7 +218,12 @@ webhook base) must be public, so Caddy exposes `/media/*`. `/readyz` reports the
 
 | File | Change |
 |---|---|
-| `setuhaul/voice.py` | Backends (Sarvam, self-hosted), language map, spoken-text cleanup, audio store |
+| `setuhaul/voice/__init__.py` | `make_voice()`: picks the backend from `VOICE`; re-exports everything below |
+| `setuhaul/voice/base.py` | Shared: errors, transcript type, language map, HTTP and audio helpers, 24 h reply store |
+| `setuhaul/voice/openrouter.py` | `VOICE=openrouter`: OpenRouter speech endpoints (ElevenLabs Scribe v2 + Eleven v3 by default) |
+| `setuhaul/voice/sarvam.py` | `VOICE=sarvam`: Sarvam Saaras + Bulbul |
+| `setuhaul/voice/selfhosted.py` | `VOICE=selfhosted`: our own speech server (`speech/`) |
+| `setuhaul/voice/spoken_times.py` | "साढ़े ग्यारह बजे" / "eleven thirty" -> 11:30, voice transcripts only |
 | `setuhaul/inbound.py` | Voice note -> transcript before the safety check; spoken reply after the written one |
 | `setuhaul/channels/*` | Media URLs in, `media_url` out (Twilio, simulator, console) |
 | `speech/` | Self-hosted speech server (FastAPI, Dockerfile); not run here: gated models, GPU needed |
@@ -229,6 +234,11 @@ webhook base) must be public, so Caddy exposes `/media/*`. `/readyz` reports the
 python3 -I -m unittest discover -s tests -p "test_voice.py" -v
 VOICE=openrouter OPENROUTER_API_KEY=sk-or-... python3 -I scripts/voice_smoke.py --keep /tmp/voice   # uses credits
 ```
+
+**Keys on your laptop (VS Code).** Copy `prototype/.env.example` to `prototype/.env` and fill in the keys; `.env` is in
+`.gitignore`, so it is never committed. VS Code's Python extension loads it for Run/Debug (`"envFile": "${workspaceFolder}/prototype/.env"`
+in `launch.json`); in a terminal, load it with `set -a; . prototype/.env; set +a` before running the app or the smoke test.
+On the server the keys live in AWS SSM, set by `deploy/aws/put_secrets.sh`, never in a file.
 
 The portal's "Try your own message" box has a 🔊 Listen button (the browser's own voices) and a 🎤 button where
 the browser allows the microphone; the claude.ai viewer blocks the microphone, so open the portal on GitHub Pages or a laptop to speak.
