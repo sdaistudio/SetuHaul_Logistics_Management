@@ -490,6 +490,19 @@ def _twilio_ready():
     return _TWILIO_CHECK["ok"], _TWILIO_CHECK["detail"]
 
 
+def _reader_ready():
+    """Configuration only: never calls the model from a probe. Always ok: without a reader the rules run and the
+    driver gets a clarifying question, so a misconfigured reader must not fail readiness (or trigger a rollback)."""
+    backend = getattr(LLM, "backend", None)
+    if backend == "agentcore":
+        return True, "agentcore (arn set)"
+    if backend:
+        return True, backend
+    if SETTINGS.reader == "agentcore":
+        return True, "rules only: READER=agentcore but AGENTCORE_READER_ARN, AWS_REGION or boto3 is missing"
+    return True, "rules only"
+
+
 @app.get("/media/{name}")
 def media(name: str):
     """A spoken reply, fetched by WhatsApp. Unguessable token, kept 24 h; nothing else is served here."""
@@ -520,6 +533,7 @@ def readyz():
     except Exception as e:
         checks["redis"] = (False, type(e).__name__)
     checks["twilio"] = _twilio_ready()
+    checks["reader"] = _reader_ready()
     if SETTINGS.voice != "off":
         checks["voice"] = (True, f"{VOICE.backend} speech, replies at {SETTINGS.media_base_url}/media/") if VOICE and SETTINGS.media_base_url \
             else (False, "VOICE is set but the backend or MEDIA_BASE_URL is missing")
