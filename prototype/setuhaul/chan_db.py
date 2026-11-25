@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS channel_traces (
 CREATE TABLE IF NOT EXISTS demo_world_applied (
     event_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL
 );
--- Spoken replies (voice.py). WhatsApp fetches a media message from a public URL, so each reply audio is kept
+-- Spoken replies (setuhaul/voice/). WhatsApp fetches a media message from a public URL, so each reply audio is kept
 -- here under an unguessable token for a day and served at /media/<token>.<ext>.
 CREATE TABLE IF NOT EXISTS wa_media (
     token TEXT PRIMARY KEY, content_type TEXT NOT NULL, data BLOB NOT NULL, created_real TEXT NOT NULL, expires_real TEXT NOT NULL

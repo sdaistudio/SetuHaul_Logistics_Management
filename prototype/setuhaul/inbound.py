@@ -4,7 +4,7 @@
     background -> process():
         identity (verified sender number only) -> rate limit -> per-driver lock
         -> 24 h window opens -> STOP/START -> first-contact privacy notice
-        -> voice note? speech-to-text (voice.py) -> SAFETY freeze? -> unsupported types -> offer binding
+        -> voice note? speech-to-text (setuhaul/voice/) -> SAFETY freeze? -> unsupported types -> offer binding
         -> graph.run_turn (unchanged engine; it only ever sees text)
         -> SAFETY freeze on a new safety escalation -> render (guard body + option titles)
         -> outbox rows in ONE transaction (+ a spoken reply when the driver spoke) -> worker sends after COMMIT

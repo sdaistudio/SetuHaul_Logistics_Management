@@ -30,7 +30,7 @@ class Settings:
     redis_url: str = ""
     duty_head_phone: str = ""
     worker: bool = True
-    voice: str = "off"                            # off | sarvam | selfhosted (speech models, see voice.py)
+    voice: str = "off"                            # off | openrouter | sarvam | selfhosted (see setuhaul/voice/)
     media_base_url: str = ""                      # public base WhatsApp fetches spoken replies from; default webhook base
 
     @classmethod
