@@ -87,11 +87,11 @@ pre.schema{font-family:var(--mono);font-size:11.5px;background:#141B2A;border:1p
 <tr><td>Orchestration</td><td>LangGraph StateGraph: verify → dedupe → read → safety → dispatch</td><td class="mono">setuhaul/graph.py</td><td class="mono">Session.run()</td></tr>
 <tr><td>Words</td><td>Rules; Claude Haiku via LangChain only when rules say UNKNOWN, strict JSON checked in code</td><td class="mono">setuhaul/nlu.py · setuhaul/llm.py</td><td>Rules; a clarifying question instead of the model</td></tr>
 <tr><td>Tools</td><td>ETA, feasibility, planner, booking, escalation — plain Python</td><td class="mono">eta · timeline · planner · capacity · escalation</td><td>Same</td></tr>
-<tr><td>System of record</td><td>Managed Postgres with an EXCLUDE constraint</td><td class="mono">setuhaul/db.py</td><td>SQLite, BEGIN IMMEDIATE and triggers</td></tr>
+<tr><td>System of record</td><td>MVP 1: SQLite on the server (one writer, overlap trigger, nightly backups). MVP 2: Postgres (EXCLUDE constraint) or MongoDB</td><td class="mono">setuhaul/db.py</td><td>SQLite, BEGIN IMMEDIATE and triggers</td></tr>
 <tr><td>Outbound</td><td>Outbox drained to WhatsApp, SMS, e-mail, phone task</td><td class="mono">app.py send_whatsapp()</td><td>Outbox table</td></tr>
 <tr><td>Observability</td><td>LangSmith trace per turn, phones masked, guardrail tags</td><td class="mono">setuhaul/tracing.py</td><td>audit_log table</td></tr>
 <tr><td>Humans</td><td>Coordinator console: approve, reject, hand-offs, board</td><td class="mono">app.py /console/*</td><td><a href="handoffs.html" style="color:var(--saffron)">This prototype's Hand-offs page</a></td></tr>
-<tr><td>Cost</td><td colspan="3">One small container + managed Postgres + small Redis ≈ ₹8,000 a month for MVP 1 (see the walkthrough script's cost tables)</td></tr></table></div>
+<tr><td>Cost</td><td colspan="3">One small server (app + SQLite + Redis) ≈ ₹3,000 a month for MVP 1; MVP 2 adds a managed Postgres or MongoDB (about ₹5,000 a month) (see the walkthrough script's cost tables)</td></tr></table></div>
 </main>
 <script src="data.js"></script><script src="app.js"></script>
 <script>

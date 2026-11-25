@@ -59,13 +59,13 @@ CONVERSATIONS = [
         ("09:30", "ਪਹਿਲਾ", "1")]),
     ("mwr-vague", "mwr", "Vague delay: the bot asks for a time first", "C09", "DRV010", [
         ("09:42", "भाई म्हैं थोड़ो मोड़ो हूं, ट्रैफिक घणो है", "I am a bit late, lots of traffic"),
-        ("09:43", "11:30 बज्यां तांई पूगसूं", "I will reach by about 11:30")]),
+        ("09:43", "11:30 बज्यां तांई पूगसूं", "I will reach by 11:30")]),
     ("gu-safety", "gu", "Accident: scheduling stops, shift manager paged", "C12", "DRV011", [
         ("10:05", "અકસ્માત થયો છે, હેલ્પરને ઈજા થઈ છે, ટ્રક બાજુમાં ઊભો રાખ્યો છે", "accident happened, helper is hurt, truck parked on the side")]),
     ("pa-safety", "pa", "Accident in Punjabi", "C12", "DRV011", [
         ("10:05", "ਭਾਜੀ ਹਾਦਸਾ ਹੋ ਗਿਆ, ਹੈਲਪਰ ਨੂੰ ਸੱਟ ਲੱਗੀ ਹੈ", "accident happened, the helper is hurt")]),
     ("mwr-later", "mwr", "Marwari: arrival time with 'after 12'", "C07", "DRV006", [
-        ("09:34", "शाहपुरा पछै ट्रैफिक घणो है। 11:20 बज्यां तांई पूगसूं। 12 बज्यां पछै कोई स्लॉट है कांई?",
+        ("09:34", "शाहपुरा पछै ट्रैफिक घणो है। लगभग 11:20 बज्यां पूगसूं। 12 बज्यां पछै कोई स्लॉट है कांई?",
          "Traffic after Shahpura. Reaching around 11:20. Any slot after 12?"),
         ("09:35", "दूजो", "2")]),
 ]

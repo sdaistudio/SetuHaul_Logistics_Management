@@ -50,12 +50,12 @@ On the Free plan this is paid entirely by credits (about $75 over the 6-month pl
 
 New AWS accounts receive $100 in Free Tier credits, plus up to $100 more for console activities. On the Free plan the account stops after 6 months or when the credits run out, whichever comes first. Upgrading keeps the remaining credits until 12 months after sign-up. WhatsApp message charges are separate: they are billed by Twilio, and the Sandbox is free.
 
-**Conflict to note, not resolved here.** The Decision Register, Working Prototype, Client Readout and Solution Design all give the **pilot** as "one small container plus managed Postgres, about US$20-30 a month". This page describes a cheaper **demo** configuration (about $8.85, SQLite, no managed database). Both figures are correct for what they describe. The Word documents were not edited; if the readout quotes a hosting cost, it should say which configuration it means.
+**Decision (20 Nov 2026).** MVP 1, the pilot, stays on **SQLite** on a single server, like this deployment. MVP 2 moves the system of record to **Postgres or MongoDB**. The Solution Design and the walkthrough script now say this. Older Word documents (Decision Register, Working Prototype, Client Readout) still quote "one small container plus managed Postgres, about US$20-30 a month" for the pilot. That figure now belongs to MVP 2.
 
 ## Limits (by design)
 
 - **Single box, single AZ.** If the instance or the zone fails, the service is down until auto-recovery or a manual relaunch. Recovery keeps the volume; backups protect data, not uptime.
-- **SQLite only:** one writer, one uvicorn worker. Fine for a demo and a handful of drivers. Not for two facilities at pilot volume with a coordinator console under load; that needs the Postgres path.
+- **SQLite only:** one writer, one uvicorn worker. Fine for a demo and a handful of drivers. Not for two facilities at pilot volume with a coordinator console under load; that is the MVP 2 move to Postgres or MongoDB.
 - **Demo clock.** In `CLOCK_MODE=snapshot`, every restart resets the clock to `SNAPSHOT_ANCHOR` while the database keeps its bookings. `reset-demo.sh` rebuilds a clean 4 Aug world for each demo run.
 - **Twilio Sandbox:**
   - test phones must join with a code, and the join lasts 3 days;

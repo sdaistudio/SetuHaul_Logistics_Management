@@ -377,7 +377,7 @@
      "tools": [
       "read_message:REPORT_DELAY",
       "resolve_shipment:SHP1012",
-      "record_eta:11:10 MEDIUM",
+      "record_eta:11:10 HIGH",
       "scheduling_tool:replan+earmarks",
       "check_slot_feasibility:3 options"
      ],
@@ -429,18 +429,17 @@
     {
      "t": "09:43",
      "text": "11:30 बज्यां तांई पूगसूं",
-     "reply": "Jaipur DC में थांकै ट्रक सारू ऐ स्लॉट है (थे चुणोला जद ही बुक हुसी):\n1) डॉक D5 - 12:00 PM सूं सरू, लगभग 12:55 PM तांई खाली\n2) डॉक D5 - 1:00 PM सूं सरू, लगभग 1:55 PM तांई खाली\n3) डॉक D5 - 2:00 PM सूं सरू, लगभग 2:55 PM तांई खाली\nबुक करण सारू 1, 2 या 3 भेजो।",
-     "state": "OPTIONS_SHOWN",
+     "reply": "धन्यवाद। लगभग 11:30 AM पूगण माथै भी थांकी बुकिंग (डॉक D5, 11:45 AM सूं) चालसी। कीं बदळण री जरूरत कोनी।",
+     "state": "BOOKED",
      "lang": "mwr",
      "tools": [
       "read_message:REPORT_DELAY",
-      "record_eta:11:30 MEDIUM",
+      "record_eta:11:30 HIGH",
       "scheduling_tool:replan+earmarks",
-      "check_current_booking:AT_RISK",
-      "check_slot_feasibility:3 options"
+      "check_current_booking:STILL_FEASIBLE"
      ],
-     "text_en": "I will reach by about 11:30",
-     "reply_en": "Slots your truck can make at Jaipur DC (nothing is booked until you choose):\n1) Dock D5 - start 12:00 PM, unloading done by about 12:55 PM\n2) Dock D5 - start 1:00 PM, unloading done by about 1:55 PM\n3) Dock D5 - start 2:00 PM, unloading done by about 2:55 PM\nReply 1, 2 or 3 to book.",
+     "text_en": "I will reach by 11:30",
+     "reply_en": "Thanks. With arrival at about 11:30 AM, your current booking (Dock D5, start 11:45 AM) still works. No change needed.",
      "same_outcome": true
     }
    ]
@@ -509,7 +508,7 @@
    "turns": [
     {
      "t": "09:34",
-     "text": "शाहपुरा पछै ट्रैफिक घणो है। 11:20 बज्यां तांई पूगसूं। 12 बज्यां पछै कोई स्लॉट है कांई?",
+     "text": "शाहपुरा पछै ट्रैफिक घणो है। लगभग 11:20 बज्यां पूगसूं। 12 बज्यां पछै कोई स्लॉट है कांई?",
      "reply": "Jaipur DC में थांकै ट्रक सारू ऐ स्लॉट है (थे चुणोला जद ही बुक हुसी):\n1) डॉक D2 - 12:00 PM सूं सरू, लगभग 12:45 PM तांई खाली\n2) डॉक D4 - 12:40 PM सूं सरू, लगभग 1:25 PM तांई खाली\n3) डॉक D2 - 1:00 PM सूं सरू, लगभग 1:45 PM तांई खाली\nबुक करण सारू 1, 2 या 3 भेजो।",
      "state": "OPTIONS_SHOWN",
      "lang": "mwr",

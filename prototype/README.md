@@ -50,6 +50,7 @@ Every run works on a fresh copy of `data/setuhaul_freight_operations.db`; the su
 | `setuhaul/tracing.py` | LangSmith tracing with phone numbers masked and guardrail tags |
 | `tests/test_production_layer.py` | 24 tests for the production layer (no network, no keys needed) |
 | `tests/test_integrity.py` | The 12 integrity tests |
+| `tests/test_sqlite_guards.py` | MVP 1 on SQLite: booking-guard triggers are restored at start-up and checked by `/readyz`, preflight and the restore drill |
 | `run_*.py` | Runners for the scenario, the integrity proof and the scheduler comparison |
 | `scripts/audit.py` | The data audit: one proof query per finding |
 | `out/` | The results quoted in the Word documents |
@@ -133,6 +134,32 @@ TWILIO_AUTH_TOKEN=sim-token .venv/bin/python -I scripts/sim_server.py          #
 | `tests/test_twilio_channel.py` | 40 channel tests, including console-vs-Twilio parity on C03 and C06 |
 
 
+## Try your own message (portal)
+
+The Driver Messages page (`driver.html`, section "Try your own message") lets anyone type a message as any 4 August
+driver and see SetuHaul's answer. It runs the real engine in the browser with Pyodide: the same `setuhaul` modules and
+the same database, bundled into `playground_bundle.json` (about 0.6 MB; Pyodide itself loads from its CDN, about 12 MB,
+only when the box is started). Nothing typed leaves the viewer's machine. Rules only, no model call. The yard starts as
+it stood at 08:20 (the morning's later events are not replayed), and the clock only moves forward.
+
+| File | Purpose |
+|---|---|
+| `web/playground.py` | The glue the page calls: `reset()`, `drivers()`, `send(driver_id, text, "HH:MM")`; opens SQLite without WAL (the browser has no shared memory) |
+| `scripts/build_playground.py` | Writes `playground_bundle.json` (glue + the setuhaul modules it imports + the database). Re-run after engine changes |
+| `tests/test_playground.py` | Runs the glue on the standard library alone (as Pyodide does) and fails if the committed bundle is stale |
+| `scripts/build_pyodide_runtime.py` | Makes the portal's own `pyodide/` folder (Pyodide 0.27.7 runtime + sqlite3), see below |
+
+**Inside the claude.ai viewer** a page may load scripts from the Pyodide CDN but may not `fetch()` from it, so
+Pyodide cannot download its WebAssembly runtime there. The published portal therefore serves its own copy in
+`pyodide/` (about 15 MB, unmodified Pyodide 0.27.7 files; the `.zip` and `.whl` the viewer will not serve are stored
+as base64 JSON and decoded in memory). `driver.html` uses that copy when it exists and the CDN otherwise, so the
+repository does not carry the binaries; GitHub Pages or a laptop server loads Pyodide from the CDN.
+
+```
+python3 -I scripts/build_playground.py
+python3 -I -m unittest discover -s tests -p "test_playground.py" -v
+```
+
 ## Driver languages
 
 Drivers can write in English, Hinglish, Hindi, Gujarati, Marathi, Punjabi and Marwari. Detection and reading
@@ -141,25 +168,73 @@ are rules only (no model call); replies come from the reviewed catalogue in the 
 | File | Change |
 |---|---|
 | `setuhaul/languages.py` | Language list, scripts, native digits, Marathi/Marwari marker words, reading vocabulary per language |
-| `setuhaul/nlu.py` | Detects the languages; reads times, durations, "after 12", choices, slot references and safety words in each |
+| `setuhaul/nlu.py` | Detects the languages; reads times, durations, "after 12", "by 11:30", choices, slot references, early arrival, yard, trailer/reefer, urgency, "leave by", "which slots", "keep my slot" and safety words (whole words) in each |
 | `setuhaul/replies_regional.py` | 30 reply texts per new language (drafts for native review); the rest fall back to Hindi |
 | `setuhaul/replies.py` | Merges them; the output guard reads every language's dock word and "booked" words |
 | `setuhaul/workflow.py` | Phrases built in code (ETA basis, approval reasons, "or") per language |
 | `templates/twilio_templates.yaml`, `setuhaul/templates.py` | Proactive templates per language (each needs its own WhatsApp approval) |
 | `tests/test_languages.py` | 16 tests: detection, reading, false-alarm checks, placeholders, guard, full turns |
 | `scripts/language_demo.py` | Runs 8 demo conversations in the new languages and in English; writes `out/language_demo.json` and the portal's `lang_data.js` |
+| `scripts/language_replay.py` | Replays the whole 4 Aug morning with every driver message translated (Hinglish, Hindi, Gujarati, Marathi, Punjabi, Marwari) |
+| `tests/test_language_replay.py` | 12 tests: native-script intents, "by" vs "about", whole-word safety, and every replayed turn ends in the same state as English |
 
 ```
 python3 -I scripts/language_demo.py out/
 python3 -I -m unittest discover -s tests -p "test_languages.py" -v
+python3 -I scripts/language_replay.py gu /tmp/gu      # one language's full morning
+python3 -I -m unittest discover -s tests -p "test_language_replay.py" -v
 ```
 
 Limits: romanised Gujarati, Marathi, Punjabi or Marwari is read as Hinglish and answered in Hinglish. Marwari
 varies from district to district; the drafts follow Marwari as written around Jaipur and Jodhpur. All new reply texts need a native
 speaker's review before go-live, and each language's WhatsApp templates need separate approval.
 
+## Voice notes (VOICE=off | openrouter | sarvam | selfhosted)
+
+A driver can send a WhatsApp voice note instead of typing. Speech models (not an LLM) do the listening and speaking;
+the rules engine in between is unchanged and only ever sees text.
+
+```
+voice note (OGG) -> fetch from Twilio (account auth, Twilio hosts only) -> speech-to-text in the driver's language
+  -> the transcript is the driver's message: STOP, safety words, options, the engine, the guards, all as typed
+  -> written reply with option buttons (as today) -> the same reply spoken -> /media/<token>.mp3 -> WhatsApp voice note
+```
+
+| Setting | Backend | Speech-to-text | Text-to-speech |
+|---|---|---|---|
+| `VOICE=openrouter` | OpenRouter speech endpoints (`OPENROUTER_API_KEY`) | ElevenLabs Scribe v2 (`OPENROUTER_STT_MODEL`) | ElevenLabs Eleven v3 (`OPENROUTER_TTS_MODEL`) |
+| `VOICE=sarvam` | Sarvam AI hosted API (`SARVAM_API_KEY`) | Saaras | Bulbul |
+| `VOICE=selfhosted` | `speech/` on our GPU box (`VOICE_SERVER_URL`) | AI4Bharat IndicConformer (MIT) + Whisper small for English | AI4Bharat Indic Parler-TTS (Apache-2.0) |
+
+Speech models often write times as words ("साढ़े ग्यारह बजे", "eleven thirty"); `voice.spoken_times` turns clock times
+(a number with बजे / baje / વાગ્યે / वाजता / ਵਜੇ / o'clock, or "half past", "quarter to") into digits before the engine
+reads them. Durations ("एक घंटा") are left alone, and typed text never goes through this step.
+
+Marwari and Hinglish are heard and spoken through Hindi. A first voice note is language-detected by the model;
+after that the conversation's language is the hint. If the note cannot be understood the driver gets
+"please say it again slowly, or type it" in their language; if speaking the reply fails, the written reply still goes.
+Spoken replies are kept 24 h under an unguessable token (`wa_media` table) and `MEDIA_BASE_URL` (default: the
+webhook base) must be public, so Caddy exposes `/media/*`. `/readyz` reports the voice backend when it is on.
+
+| File | Change |
+|---|---|
+| `setuhaul/voice.py` | Backends (Sarvam, self-hosted), language map, spoken-text cleanup, audio store |
+| `setuhaul/inbound.py` | Voice note -> transcript before the safety check; spoken reply after the written one |
+| `setuhaul/channels/*` | Media URLs in, `media_url` out (Twilio, simulator, console) |
+| `speech/` | Self-hosted speech server (FastAPI, Dockerfile); not run here: gated models, GPU needed |
+| `scripts/voice_smoke.py` | Live check with your key: speaks a line per language, converts it to a WhatsApp OGG note, transcribes it, and checks the engine reads the same meaning as the typed line |
+| `tests/test_voice.py` | 20 tests: request shapes (OpenRouter, Sarvam, self-hosted), spoken clock times, host allowlist, end-to-end voice turn, unclear note, TTS failure, spoken STOP and safety |
+
+```
+python3 -I -m unittest discover -s tests -p "test_voice.py" -v
+VOICE=openrouter OPENROUTER_API_KEY=sk-or-... python3 -I scripts/voice_smoke.py --keep /tmp/voice   # uses credits
+```
+
+The portal's "Try your own message" box has a 🔊 Listen button (the browser's own voices) and a 🎤 button where
+the browser allows the microphone; the claude.ai viewer blocks the microphone, so open the portal on GitHub Pages or a laptop to speak.
+
 ## What the prototype does not do
 
 * The scenario run and integrity proof make no live WhatsApp or LLM call. Where the design calls the LLM fallback and no key is set, the workflow asks the driver a clarifying question instead.
 * The coordinator console is an API (`app.py`) plus the static portal pages; there is no separate console screen yet.
-* SQLite only. The Postgres DDL and the plan to re-run the proof on Postgres are in deliverables 3 and 5.
+* SQLite only, by decision for MVP 1. MVP 2 moves to Postgres or MongoDB; the Postgres DDL and the plan to re-run the proof on it are in deliverables 3 and 5.

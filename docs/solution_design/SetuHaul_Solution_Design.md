@@ -100,7 +100,7 @@ so code chooses every next step and the model never picks a tool.
 | D12 | Human approval or takeover               | Eight rule-based triggers, routed by role with an SLA                                                        | ESC-0001 to 0004                  |
 | D13 | Proving no double booking                | Five defence layers; 10-driver race × 50; negative controls; stress test                                     | T01–T12                           |
 | D14 | What a slot means                        | A start window; gate-in by start + grace; unloads may run past slot end                                      | F04, F05                          |
-| D15 | Architecture and cost                    | One container plus managed Postgres for the pilot                                                            | Review pack                       |
+| D15 | Architecture and cost                    | MVP 1: one server with SQLite; MVP 2: Postgres or MongoDB (chosen at MVP 2 kickoff)                           | Review pack                       |
 | D16 | Where the LLM is used                    | Reading words only, after rules, strict JSON; replies from a catalogue                                       | C09                               |
 | D17 | Languages                                | Deterministic detection; 7 languages (EN, Hinglish, Hindi, Gujarati, Marathi, Punjabi, Marwari)             | C06, C09, C12                     |
 | D18 | Earmarks                                 | Soft 20-minute protection for HIGH/CRITICAL and deadline trucks                                              | 09:45                             |
@@ -385,9 +385,11 @@ chat_messages, operational_messages, facility_contacts, facility_rules.
 | Governance    | appointment_events, escalations, audit_log + guardrail_events + outbox                                                             | History, hand-offs, guard results                                                                                        |
 | Commercial    | detention_terms, eway_bills, coordinator_shifts                                                                                    | Free time and charges; the e-way bill's legal clock; who is on duty with a working number                                |
 
-In Postgres the overlap trigger becomes a constraint: EXCLUDE USING gist
-(dock_id WITH =, during WITH &&) WHERE (live AND kind IN
-('BOOKING','HOLD')).
+MVP 1 keeps SQLite and its overlap trigger. In MVP 2, on Postgres the
+trigger becomes a constraint: EXCLUDE USING gist (dock_id WITH =, during
+WITH &&) WHERE (live AND kind IN ('BOOKING','HOLD')). MongoDB has no
+equivalent, so there the rule moves into code: a per-dock lock document
+updated inside the same transaction as the booking.
 
 ## Integrity and concurrency
 
@@ -541,14 +543,17 @@ at 09:16, 7 hours before the driver's 16:24 message.
 
 ## Deployment, operations and cost
 
-The pilot runs as one container plus managed Postgres for about
-US\$20–30 a month, with WhatsApp messaging adding a few hundred rupees a
-month at pilot volume.
+The pilot (MVP 1) runs on one small server with SQLite, Redis and
+nightly backups for about ₹3,000 a month, with WhatsApp messaging adding
+a few hundred rupees a month at pilot volume. MVP 2 moves the system of
+record to managed Postgres or MongoDB (about ₹5,000 a month more),
+because GPS pings, the control tower and more facilities need many
+writers.
 
 | Component          | Pilot                                                                                         | Scale path                                                         |
 |--------------------|-----------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | Webhook + workflow | One container (Python 3, standard library + SQLite in the prototype)                          | AWS serverless functions behind a queue, one consumer per facility |
-| System of record   | Managed Postgres with the EXCLUDE constraint                                                  | Same, with read replicas for the control tower                     |
+| System of record   | SQLite on the server: one writer, overlap trigger, nightly backups                            | MVP 2: Postgres (EXCLUDE constraint) or MongoDB, with read replicas |
 | Language fallback  | Claude Haiku, no tools, strict JSON                                                           | Same; rules cover most messages                                    |
 | Channel            | WhatsApp Business API; 1,000 free service messages a month per number, then about ₹0.145 each | Utility templates for proactive messages                           |
 | Portal             | Static site (GitHub Pages)                                                                    | Coordinator console behind sign-in                                 |
@@ -584,10 +589,11 @@ message retention period; which facilities join the pilot first.
 **Roadmap**
 
 1.  **Pilot (MVP 1):** Jaipur DC, WhatsApp driver chat, coordinator
-    console, Postgres.
+    console, SQLite.
 
 2.  **MVP 2:** GPS or FASTag feed, red/amber/green control tower,
-    message series R1–R8, all facilities.
+    message series R1–R8, all facilities; system of record moves
+    to Postgres or MongoDB.
 
 3.  **Scale:** remaining facilities, CP-SAT planner, detention and e-way
     bill clocks, more languages (Marathi, Gujarati, Punjabi, Bengali).

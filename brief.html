@@ -192,7 +192,7 @@ table('t-doc',['Element in the solution design','In this prototype','Status / re
  ['Data audit D1–D17','Merged into 36 findings (F01–F36), ~15 new',OK],
  ['7 new tables + 2 triggers','Built: 12 tables + 3 triggers; proposed for MVP 2: GPS, language, comms series',OK+' '+L('insights.html#new-tables','Schema')],
  ['Reefer option "start after 21:00 with approval"','Removed: D5 is in maintenance until 22:00 and the site closes at 22:00',AD+' option does not exist'],
- ['LangGraph, FastAPI, Gradio, Cognito, Redis, LangSmith, Presidio, LiteLLM','Plain Python state machine, one web service, one database; others when there is a reason',AD+' lean pilot ≈ US$20–30/month']]);
+ ['LangGraph, FastAPI, Gradio, Cognito, Redis, LangSmith, Presidio, LiteLLM','Plain Python state machine, one web service, one database; others when there is a reason',AD+' lean pilot on SQLite ≈ ₹3,000/month; Postgres or MongoDB from MVP 2']]);
 /* reference tables */
 table('t-ask',['Ask the driver (only they know)','Look up (the backend knows)'],[
  ['Which shipment, if two are active (DRV004)','Their shipments, vehicle, load weight, dock type, priority'],['A firmer ETA if they gave a range or "late by 1 hour" (stated back first)','Current appointment and slot, latest ETA history'],['The hard limit behind "another pickup"','Facility rules, dock events, open and occupied slots'],['Their choice among the options','Who else is competing for the same window']]);

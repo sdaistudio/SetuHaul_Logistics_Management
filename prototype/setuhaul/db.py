@@ -179,6 +179,37 @@ def connect(path):
     return con
 
 
+# MVP 1 runs on SQLite (decision of 20 Nov 2026; MVP 2 moves to Postgres or MongoDB). In SQLite the
+# no-double-booking promise lives in these triggers, so a database without them must never serve traffic.
+GUARDS = ("trg_no_overlap", "trg_appt_guard", "trg_active_must_be_current")
+
+_LIVE_OVERLAPS = """
+SELECT COUNT(*) FROM dock_reservations a JOIN dock_reservations b
+  ON a.dock_id = b.dock_id AND a.reservation_id < b.reservation_id
+ WHERE a.live = 1 AND b.live = 1 AND a.kind IN ('BOOKING','HOLD') AND b.kind IN ('BOOKING','HOLD')
+   AND julianday(a.start_ts) < julianday(b.end_ts) AND julianday(b.start_ts) < julianday(a.end_ts)"""
+
+
+def ensure_extensions(con):
+    """Re-apply the schema extensions (every statement is IF NOT EXISTS). Used at start-up on a persistent
+    or restored database, so a copy that lost a trigger or table gets it back before serving."""
+    con.executescript(EXTENSIONS)
+
+
+def guard_problems(con):
+    """What would break the booking guarantee: missing guard triggers, or live BOOKING/HOLD intervals that
+    already overlap on a dock. An empty list means the database is safe to serve."""
+    have = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")}
+    problems = ["missing trigger " + g for g in GUARDS if g not in have]
+    tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "dock_reservations" not in tables:
+        return problems + ["missing table dock_reservations"]
+    n = con.execute(_LIVE_OVERLAPS).fetchone()[0]
+    if n:
+        problems.append(f"{n} overlapping live booking/hold pair(s)")
+    return problems
+
+
 @contextlib.contextmanager
 def write_txn(con):
     """BEGIN IMMEDIATE ... COMMIT, or ROLLBACK on any exception."""

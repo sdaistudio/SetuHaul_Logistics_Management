@@ -186,8 +186,14 @@ def check_stores(env, rep):
                 con = sqlite3.connect(f"file:{full}?mode=ro", uri=True)
                 con.execute("SELECT COUNT(*) FROM drivers").fetchone()
                 has = con.execute("SELECT 1 FROM sqlite_master WHERE name='wa_delivery'").fetchone()
+                from setuhaul.db import guard_problems
+                problems = guard_problems(con)
                 con.close()
                 rep.ok("stores", "database opens read-only" + ("" if has else " (channel tables are created when the app starts)"))
+                if problems:
+                    rep.warn("stores", "booking guards: " + "; ".join(problems) + " (missing triggers are re-created when the app starts; overlaps need a person)")
+                else:
+                    rep.ok("stores", "booking guards present (3 triggers), no overlapping live bookings")
             except sqlite3.Error as e:
                 rep.fail("stores", f"database error: {e}")
     url = env.get("REDIS_URL")

@@ -1,0 +1,10 @@
+# SetuHaul speech server (GPU box). Not needed by the main app.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+numpy
+torch>=2.2
+torchaudio>=2.2
+transformers>=4.46
+onnxruntime-gpu>=1.17          # IndicConformer remote code runs ONNX parts
+git+https://github.com/huggingface/parler-tts.git

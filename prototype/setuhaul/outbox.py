@@ -53,7 +53,8 @@ def window_open(con, e164, real_now):
 
 def enqueue(con, as_of, real_now, msg: OutboundMessage, role="DRIVER", kind="DRIVER_REPLY", trace_id=None, ignore_opt_out=False):
     """Queue one WhatsApp message. MUST run inside the caller's write transaction."""
-    msg_id = K.outbox(con, as_of, "WHATSAPP", msg.to_e164, kind, msg.body or TPL.preview(msg.template_ref, msg.template_vars, msg.lang))
+    text = msg.body or (f"[voice note {msg.media_url}]" if msg.kind == "media" else TPL.preview(msg.template_ref, msg.template_vars, msg.lang))
+    msg_id = K.outbox(con, as_of, "WHATSAPP", msg.to_e164, kind, text)
     msg.outbox_id = msg_id
     payload = msg.as_dict()
     payload["ignore_opt_out"] = ignore_opt_out

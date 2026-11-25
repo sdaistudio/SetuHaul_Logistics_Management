@@ -49,7 +49,8 @@ MARKERS = {
 TIME_WORDS = r"baje|bje|बजे|बज्यां|बज्या|वाजता|वाजेपर्यंत|वाजे|વાગ્યે|વાગે|વાગ્યા|ਵਜੇ"
 AFTER_WORDS = r"ke baad|ke bad|के बाद|बाद|नंतर|પછી|ਤੋਂ ਬਾਅਦ|ਬਾਅਦ|पछै"
 APPROX_WORDS = r"around|about|approx|approximately|lagbhag|~|tak|लगभग|सुमारे|આશરે|લગભગ|ਲਗਭਗ"
-APPROX_AFTER = r"सुमारे|આશરે|ਲਗਭਗ|ਤੱਕ|तांई|पर्यंत|સુધી|सुधी"   # new languages only: "11:30 ਤੱਕ"
+APPROX_AFTER = r"सुमारे|આશરે|ਲਗਭਗ"   # new languages only: "11:20 ਲਗਭਗ". The words for "by" (ਤੱਕ, तांई, पर्यंत,
+                                      # સુધી) are NOT here: "11:30 ਤੱਕ" is a firm "by 11:30", like English "by" and Hinglish "tak"
 DUR_WORDS = [                     # (pattern, minutes), most specific first
     (r"dedh ghant[ae]|डेढ़ घंट[ाेो]|दीड तास|દોઢ કલાક|ਡੇਢ ਘੰਟ[ਾੇ]", 90),
     (r"aadha ghanta|आधा घंटा|आधो घंटो|अर्धा तास|અડધો કલાક|અડધા કલાક|ਅੱਧਾ ਘੰਟਾ", 30),
@@ -64,6 +65,22 @@ ARRIVE_WORDS = r"पोहोच|पूग|પહોંચ|ਪਹੁੰਚ"     
 EVENING = r"\bevening\b|\bshaam\b|\bsham\b|शाम|सांझ|संध्याकाळ|સાંજ|ਸ਼ਾਮ"
 MORNING = r"\bmorning\b|\bsubah\b|सुबह|सकाळ|दिनूगै|સવાર|ਸਵੇਰ"
 HUMAN = r"talk to (a )?(person|human|someone|manager)|call me|insaan se|manager se baat|माणसाशी बोल|मॅनेजरशी बोल|માણસ સાથે વાત|મેનેજર સાથે વાત|ਬੰਦੇ ਨਾਲ ਗੱਲ|ਮੈਨੇਜਰ ਨਾਲ ਗੱਲ|मिनख सूं बात"
+# Intent words in native scripts (Hindi, Gujarati, Marathi, Punjabi, Marwari). nlu.py adds each to the matching
+# English / romanised rule, so the same request reads the same in every language. Matched on the lower-cased text.
+EARLY = (r"जल्दी आ गया|जल्दी पहुँच गया|पहले पहुँच गया|वहेलो आवी|વહેલો આવ|વહેલા આવ|વહેલો પહોંચ|लवकर आलो|लवकर आले|"
+         r"लवकर पोहोचलो|ਜਲਦੀ ਆ ਗਿਆ|ਜਲਦੀ ਪਹੁੰਚ ਗਿਆ|जल्दी आग्यो|जल्दी पूग्यो|वेगो आग्यो|वेगो पूग्यो")
+YARD = r"यार्ड|યાર્ડ|ਯਾਰਡ"
+HEAVY = r"ट्रेलर|ટ્રેલર|ਟ੍ਰੇਲਰ|ਟਰੇਲਰ|हैवी|હેવી|ਹੈਵੀ"          # not भारी/ભારે alone: "भारी ट्रैफिक" is heavy traffic
+REEFER = r"रीफर|રીફર|ਰੀਫਰ"
+URGENT = r"अर्जेंट|अर्जंट|અર્જન્ટ|ਅਰਜੈਂਟ|तुरंत चाहिए"
+LEAVE_AFTER = r"निकल|નીકળ|निघ|ਨਿਕਲ|निकळ"                     # "1:30 बजे तक निकलना है" -> latest gate-out
+BY_WORDS = r"तक|સુધીમાં|સુધી|पर्यंत|ਤੱਕ|तांई"
+NEXT_LOAD = r"दूसरा लोड|दूसरी पिकअप|બીજો લોડ|दुसरा लोड|ਦੂਜਾ ਲੋਡ|दूजो लोड"
+ASK_OPTIONS = (r"कौन से स्लॉट|कौन सा स्लॉट|કયા સ્લોટ|કયો સ્લોટ|कोणते स्लॉट|कोणता स्लॉट|ਕਿਹੜੇ ਸਲਾਟ|ਕਿਹੜਾ ਸਲਾਟ|"
+               r"कुणसा स्लॉट|कुणसो स्लॉट|कुणसी स्लॉट")
+AND_AFTER = r"^\s*(?:aur|और|અને|आणि|ਤੇ|ਅਤੇ|अर)\s"                 # "और 3 बजे के बाद?" = "what about after 3?"
+DECLINE = (r"apna slot (?:hi )?rakh|स्लॉट ही रख|अपना स्लॉट रख|नहीं चाहिए|સ્લોટ જ રાખ|મારો સ્લોટ રાખ|નથી જોઈતું|"
+           r"स्लॉटच ठेव|स्लॉट ठेव|नको आहे|ਸਲਾਟ ਹੀ ਰੱਖ|ਆਪਣਾ ਸਲਾਟ ਰੱਖ|ਨਹੀਂ ਚਾਹੀਦਾ|स्लॉट ही राख|म्हारो स्लॉट राख|कोनी चाइजै")
 SLOT_REF = (r"^\s*(?:" + TIME_WORDS + r")?\S{0,4}\s*(?:वाला|वाली|वाळो|ਵਾਲਾ|ਵਾਲੀ|વાળો|વાળી)?\s*(?:स्लॉट|સ્લોટ|ਸਲਾਟ)")
 STATUS = r"चालू आहे|ચાલુ છે|ਚਾਲੂ ਹੈ|चालू है"
 ORDINALS = {                      # whole tokens only
@@ -77,6 +94,10 @@ OR_WORD = {"hi-Latn": " ya ", "hi": " या ", "gu": " અથવા ", "mr": " 
 SAFETY_WORDS = ["घायल", "एक्सीडेंट", "अपघात", "जखमी", "आग लागली", "पोलीस", "दवाखान",
                 "અકસ્માત", "ઈજા", "ઇજા", "આગ લાગી", "પોલીસ", "હોસ્પિટલ",
                 "ਹਾਦਸਾ", "ਐਕਸੀਡੈਂਟ", "ਸੱਟ", "ਜ਼ਖਮੀ", "ਜ਼ਖ਼ਮੀ", "ਅੱਗ ਲੱਗ", "ਪੁਲਿਸ", "ਹਸਪਤਾਲ"]
+# Every safety word must start a word (nlu.py). These must also END one, because longer everyday words begin with
+# them: "आग" (fire) vs "आगे" (ahead) and Marwari "आग्यो" (I have come); "chot" (injury) vs "choti" (small);
+# "fire" vs "fired". The others may take endings ("injured", "ਸੱਟਾਂ", "दवाखान्यात").
+SAFETY_WHOLE_WORDS = {"आग", "chot", "fire"}
 
 
 def script_share(text):

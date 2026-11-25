@@ -143,6 +143,10 @@ T.update({
   "en": "Sorry, I can only read typed messages for now. Please type your message (for example: late by 1 hour, or reaching 11:30).",
   "hi-Latn": "Maaf kijiye, abhi main sirf likha hua message padh sakta hoon. Kripya message type kijiye (jaise: 1 ghanta late, ya 11:30 tak pahunchunga).",
   "hi": "माफ़ कीजिए, अभी मैं सिर्फ़ लिखा हुआ संदेश पढ़ सकता हूँ। कृपया संदेश टाइप कीजिए (जैसे: 1 घंटा देर, या 11:30 तक पहुँचूँगा)।"},
+ "voice_unclear": {
+  "en": "Sorry, I could not make out your voice note. Please say it again slowly, or type it (for example: late by 1 hour, or reaching 11:30).",
+  "hi-Latn": "Maaf kijiye, aapka voice note samajh nahi aaya. Kripya dheere se dobara boliye, ya likh dijiye (jaise: 1 ghanta late, ya 11:30 tak pahunchunga).",
+  "hi": "माफ़ कीजिए, आपका वॉइस नोट समझ नहीं आया। कृपया धीरे से दोबारा बोलिए, या लिख दीजिए (जैसे: 1 घंटा देर, या 11:30 तक पहुँचूँगा)।"},
  "location_noted": {
   "en": "Thanks, I've noted your location. Please also type the time you expect to reach us.",
   "hi-Latn": "Shukriya, aapki location note kar li. Kripya pahunchne ka time bhi likhiye.",

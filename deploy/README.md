@@ -164,7 +164,7 @@ Backups protect your **data**, not uptime. A backup runs **every night at 02:30 
    ```
    deploy/server/restore-check.sh demo_world-XXXXXXXXTXXXXXXZ.db.gz
    ```
-   It restores into a scratch copy and prints `integrity_check: ok` plus row counts. The server role can only *write* backups (least privilege), which is why you download through the console.
+   It restores into a scratch copy and prints `integrity_check: ok`, `booking guards: all 3 present` and row counts (it fails if a guard trigger is missing). The server role can only *write* backups (least privilege), which is why you download through the console.
 3. **Real restore.** Put the file on the server (it has the last 3 local copies in `/opt/setuhaul/backups/`), then:
    ```
    cd /opt/setuhaul/src/deploy/server && sudo docker compose --env-file /opt/setuhaul/compose.env stop app

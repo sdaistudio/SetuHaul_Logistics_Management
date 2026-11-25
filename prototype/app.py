@@ -27,6 +27,7 @@ Demo and ops
     POST /dev/driver-message        send a driver message without Meta (SETUHAUL_DEV=1 only)
     POST /dev/clock                 move a snapshot clock forward (SETUHAUL_DEV=1, CLOCK_MODE=snapshot)
     GET  /health, /healthz, /readyz
+    GET  /media/<token>.mp3        a spoken reply for WhatsApp to fetch (VOICE on; 24 h, unguessable token)
 
 Run:  pip install -r requirements-prod.txt
       SETUHAUL_DEV=1 uvicorn app:app --reload            (from the prototype folder)
@@ -68,6 +69,7 @@ from setuhaul.settings import Settings
 from setuhaul.tracing import mask
 from setuhaul.graph import run_turn
 from setuhaul.llm import make_fallback
+from setuhaul.voice import make_voice, load_audio
 from setuhaul.session_store import SessionStore, normalise_phone
 from setuhaul.workflow import notify_decision
 
@@ -93,6 +95,7 @@ def _init_db():
             demo_world.apply_due(con, CLOCK.now())
         con.close()
     con = db.connect(path)
+    db.ensure_extensions(con)              # a persistent or restored DB gets any missing guard back
     chan_db.ensure(con)
     con.close()
     return path
@@ -102,7 +105,8 @@ DB_PATH = _init_db()
 STORE = SessionStore.from_env()
 LLM = make_fallback()                      # None unless ANTHROPIC_API_KEY is set
 CHANNEL = get_channel(SETTINGS)
-SERVICE = ChannelService(lambda: db.connect(DB_PATH), STORE, CHANNEL, SETTINGS, CLOCK, llm=LLM, demo_world=DEMO_WORLD)
+VOICE = make_voice()                       # None unless VOICE=sarvam|selfhosted (speech models, not an LLM)
+SERVICE = ChannelService(lambda: db.connect(DB_PATH), STORE, CHANNEL, SETTINGS, CLOCK, llm=LLM, demo_world=DEMO_WORLD, voice=VOICE)
 _WAKE = {"event": None, "loop": None}
 
 
@@ -123,7 +127,7 @@ app = FastAPI(title="SetuHaul driver-exception service", lifespan=lifespan)
 
 
 def _con():
-    return db.connect(DB_PATH)             # one connection per request; SQLite WAL / Postgres pool in production
+    return db.connect(DB_PATH)             # one connection per request; SQLite WAL in MVP 1 (a pool once MVP 2 moves to Postgres or MongoDB)
 
 
 def _as_of(override=None, epoch=None):
@@ -499,14 +503,29 @@ def _reader_ready():
     return True, "rules only"
 
 
+@app.get("/media/{name}")
+def media(name: str):
+    """A spoken reply, fetched by WhatsApp. Unguessable token, kept 24 h; nothing else is served here."""
+    token = name.split(".")[0]
+    con = _con()
+    try:
+        hit = load_audio(con, token, CLOCK.real_now())
+    finally:
+        con.close()
+    if not hit:
+        raise HTTPException(404, "not found")
+    return Response(content=hit[0], media_type=hit[1], headers={"Cache-Control": "private, max-age=3600"})
+
+
 @app.get("/readyz")
 def readyz():
     checks = {}
     try:
         c = _con()
         c.execute("SELECT 1 FROM wa_delivery LIMIT 1").fetchall()
+        problems = db.guard_problems(c)    # SQLite (MVP 1): the booking guarantee lives in triggers
         c.close()
-        checks["db"] = (True, "ok")
+        checks["db"] = (False, "; ".join(problems)) if problems else (True, "ok, booking guards present")
     except Exception as e:
         checks["db"] = (False, type(e).__name__)
     try:
@@ -515,6 +534,9 @@ def readyz():
         checks["redis"] = (False, type(e).__name__)
     checks["twilio"] = _twilio_ready()
     checks["reader"] = _reader_ready()
+    if SETTINGS.voice != "off":
+        checks["voice"] = (True, f"{VOICE.backend} speech, replies at {SETTINGS.media_base_url}/media/") if VOICE and SETTINGS.media_base_url \
+            else (False, "VOICE is set but the backend or MEDIA_BASE_URL is missing")
     ok = all(v[0] for v in checks.values())
     body = {"ok": ok, "checks": {k: {"ok": v[0], "detail": v[1]} for k, v in checks.items()}, **CLOCK.describe(),
             "settings": SETTINGS.public()}

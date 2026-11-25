@@ -4,9 +4,10 @@
     background -> process():
         identity (verified sender number only) -> rate limit -> per-driver lock
         -> 24 h window opens -> STOP/START -> first-contact privacy notice
-        -> SAFETY freeze? -> unsupported types -> offer binding -> graph.run_turn (unchanged engine)
+        -> voice note? speech-to-text (voice.py) -> SAFETY freeze? -> unsupported types -> offer binding
+        -> graph.run_turn (unchanged engine; it only ever sees text)
         -> SAFETY freeze on a new safety escalation -> render (guard body + option titles)
-        -> outbox rows in ONE transaction -> worker sends after COMMIT
+        -> outbox rows in ONE transaction (+ a spoken reply when the driver spoke) -> worker sends after COMMIT
 
 The engine never sees the provider. Nothing here decides a booking.
 """
@@ -24,6 +25,7 @@ from . import offers as OF
 from . import replies as R
 from . import safety as S
 from . import escalation as E
+from . import voice as V
 from .chan_db import alarm
 from .channels.base import OutboundMessage, Option
 from .clock import iso, ts, ampm, add
@@ -43,8 +45,9 @@ def _hash(phone):
 
 
 class ChannelService:
-    def __init__(self, connect, store, channel, settings, clock, llm=None, demo_world=False):
+    def __init__(self, connect, store, channel, settings, clock, llm=None, demo_world=False, voice=None):
         self.connect, self.store, self.channel, self.s, self.clock, self.llm = connect, store, channel, settings, clock, llm
+        self.voice = voice                      # speech backend (voice.make_voice) or None: voice notes get 'please type'
         self.demo_world = demo_world
         self.on_enqueued = None                 # app sets this to wake the outbox worker
 
@@ -218,6 +221,19 @@ class ChannelService:
                 return self._queue(con, as_of, real, trace, [(self._text(msg.from_e164, lang, R.t("opted_in", lang)), "OPT_IN", {}, {})])
             trace["status"] = "IGNORED_OPTED_OUT"
             return
+        # ---- a voice note becomes text here; from now on the turn is an ordinary typed turn
+        if msg.type == "media" and self.voice and any(V.is_audio(t) for t in msg.media_types) and msg.media_urls:
+            if not self._hear(con, msg, drv, trace):
+                trace["status"] = "VOICE_UNCLEAR"
+                return self._queue(con, as_of, real, trace,
+                                   [(self._text(msg.from_e164, lang, R.t("voice_unclear", lang)), "VOICE_UNCLEAR", {}, {})])
+            word = msg.text.strip().upper().rstrip(".!")
+            if word in STOP_WORDS:                       # "stop" said aloud works like typed STOP
+                with write_txn(con):
+                    con.execute("UPDATE wa_contacts SET opted_out_at=? WHERE e164=?", (iso(real), contact["e164"]))
+                trace["status"] = "OPTED_OUT"
+                return self._queue(con, as_of, real, trace, [(self._text(msg.from_e164, lang, R.t("opted_out", lang)), "OPT_OUT",
+                                                              {}, {"ignore_opt_out": True})])
         if not contact["notice_sent_at"]:
             with write_txn(con):
                 con.execute("UPDATE wa_contacts SET notice_sent_at=? WHERE e164=?", (iso(real), contact["e164"]))
@@ -271,11 +287,58 @@ class ChannelService:
         if res.get("reply"):
             m = self._render(msg.from_e164, lang, res["reply"], oid, opts, cap.get("evidence") or {}, trace)
             out.append((m, "DRIVER_REPLY", cap.get("evidence") or {}, {}))
+            if msg.voice:                                   # they spoke, so the answer is spoken too (after the text + buttons)
+                sm = self._speak(con, msg.from_e164, lang, res["reply"], real, trace)
+                if sm:
+                    out.append((sm, "DRIVER_VOICE_REPLY", {}, {}))
             self.store.append_history(msg.from_e164, "ai", res["reply"], ts=iso(as_of), state=res.get("state"), lang=lang, tools=res.get("tools"))
         self.store.save_driver(msg.from_e164, {"driver_id": did, "shipment_id": res.get("shipment_id"), "state": res.get("state"),
                                                "lang": lang, "offer_id": oid, "last_seen": iso(as_of)})
         if out:
             self._queue(con, as_of, real, trace, out)
+
+    # ------------------------------------------------------------ voice
+    def _hear(self, con, msg, drv, trace):
+        """Voice note -> msg.text (msg.type becomes 'text', msg.voice True). False when it cannot be understood.
+        The transcript is the driver's message from here on: the same rules, guards and logs as typed text."""
+        known = one(con, "SELECT lang FROM conversations WHERE driver_id=?", drv["driver_id"])
+        hint = known and known["lang"]                       # None on a first message: the model detects the language
+        t0 = time.monotonic()
+        try:
+            audio, ctype = self.channel.fetch_media(msg.media_urls[0], V.MAX_AUDIO_BYTES)
+            tr = self.voice.transcribe(audio, ctype or msg.media_types[0], lang_hint=hint)
+        except (V.VoiceError, ValueError, OSError, AttributeError) as e:
+            trace["voice_in"] = {"ok": False, "error": type(e).__name__, "detail": str(e)[:120]}
+            return False
+        trace["voice_in"] = {"ok": bool(tr.text), "backend": tr.backend, "speech_lang": tr.speech_lang,
+                             "ms": int((time.monotonic() - t0) * 1000), "transcript": tr.text[:300]}
+        if not tr.text:
+            return False
+        text = V.spoken_times(tr.text)                         # "साढ़े ग्यारह बजे" -> "11:30" (voice only)
+        if text != tr.text:
+            trace["voice_in"]["normalised"] = text[:300]
+        msg.text, msg.type, msg.voice = text, "text", True
+        with write_txn(con):                                   # the log shows what was heard
+            con.execute("UPDATE wa_inbound SET body=? WHERE message_sid=?", ("[voice] " + text, msg.message_id))
+        return True
+
+    def _speak(self, con, to, lang, reply, real, trace):
+        """Reply text -> a voice note message, or None (the text reply has already been queued either way)."""
+        if not self.s.media_base_url:
+            trace["voice_out"] = {"ok": False, "error": "MEDIA_BASE_URL not set"}
+            return None
+        t0 = time.monotonic()
+        try:
+            audio, ctype = self.voice.speak(V.spoken(reply), lang)
+            if ctype not in V.WHATSAPP_AUDIO:
+                raise V.VoiceError(f"tts gave {ctype}, WhatsApp needs mp3/ogg")
+            token = V.store_audio(con, audio, ctype, real)
+        except V.VoiceError as e:
+            trace["voice_out"] = {"ok": False, "error": str(e)[:120]}
+            return None
+        url = f"{self.s.media_base_url}/media/{token}.{V.EXT[ctype]}"
+        trace["voice_out"] = {"ok": True, "bytes": len(audio), "ms": int((time.monotonic() - t0) * 1000), "lang": lang}
+        return OutboundMessage(to_e164=normalise_phone(to), kind="media", body="", lang=lang, media_url=url)
 
     def _render(self, to, lang, body, offer_id, opts, evidence, trace):
         """Reply -> OutboundMessage. Options become buttons (<=3) or a list (4-10), ids bound to the offer."""

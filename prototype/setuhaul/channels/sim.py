@@ -24,7 +24,7 @@ class SimChannel(TwilioChannel):
             return SendResult(ok=False, status="blocked", error_code="NO_TEMPLATE", error_message=str(e))
         payload = dict(params, kind=msg.kind, options=[o.__dict__ for o in msg.options], offer_id=msg.offer_id,
                        template_ref=msg.template_ref, template_vars=msg.template_vars, outbox_id=msg.outbox_id,
-                       ref=msg.send_ref)
+                       ref=msg.send_ref, media_url=msg.media_url)
         req = urllib.request.Request(self.s.sim_url + "/api/deliver", data=json.dumps(payload, ensure_ascii=False).encode(),
                                      headers={"Content-Type": "application/json"})
         try:
