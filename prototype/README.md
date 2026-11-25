@@ -184,7 +184,7 @@ Limits: romanised Gujarati, Marathi, Punjabi or Marwari is read as Hinglish and 
 varies from district to district; the drafts follow Marwari as written around Jaipur and Jodhpur. All new reply texts need a native
 speaker's review before go-live, and each language's WhatsApp templates need separate approval.
 
-## Voice notes (VOICE=off | sarvam | selfhosted)
+## Voice notes (VOICE=off | openrouter | sarvam | selfhosted)
 
 A driver can send a WhatsApp voice note instead of typing. Speech models (not an LLM) do the listening and speaking;
 the rules engine in between is unchanged and only ever sees text.
@@ -197,8 +197,13 @@ voice note (OGG) -> fetch from Twilio (account auth, Twilio hosts only) -> speec
 
 | Setting | Backend | Speech-to-text | Text-to-speech |
 |---|---|---|---|
+| `VOICE=openrouter` | OpenRouter speech endpoints (`OPENROUTER_API_KEY`) | ElevenLabs Scribe v2 (`OPENROUTER_STT_MODEL`) | ElevenLabs Eleven v3 (`OPENROUTER_TTS_MODEL`) |
 | `VOICE=sarvam` | Sarvam AI hosted API (`SARVAM_API_KEY`) | Saaras | Bulbul |
 | `VOICE=selfhosted` | `speech/` on our GPU box (`VOICE_SERVER_URL`) | AI4Bharat IndicConformer (MIT) + Whisper small for English | AI4Bharat Indic Parler-TTS (Apache-2.0) |
+
+Speech models often write times as words ("साढ़े ग्यारह बजे", "eleven thirty"); `voice.spoken_times` turns clock times
+(a number with बजे / baje / વાગ્યે / वाजता / ਵਜੇ / o'clock, or "half past", "quarter to") into digits before the engine
+reads them. Durations ("एक घंटा") are left alone, and typed text never goes through this step.
 
 Marwari and Hinglish are heard and spoken through Hindi. A first voice note is language-detected by the model;
 after that the conversation's language is the hint. If the note cannot be understood the driver gets
@@ -212,10 +217,12 @@ webhook base) must be public, so Caddy exposes `/media/*`. `/readyz` reports the
 | `setuhaul/inbound.py` | Voice note -> transcript before the safety check; spoken reply after the written one |
 | `setuhaul/channels/*` | Media URLs in, `media_url` out (Twilio, simulator, console) |
 | `speech/` | Self-hosted speech server (FastAPI, Dockerfile); not run here: gated models, GPU needed |
-| `tests/test_voice.py` | 16 tests: request shapes, host allowlist, end-to-end voice turn, unclear note, TTS failure, spoken STOP and safety |
+| `scripts/voice_smoke.py` | Live check with your key: speaks a line per language, converts it to a WhatsApp OGG note, transcribes it, and checks the engine reads the same meaning as the typed line |
+| `tests/test_voice.py` | 20 tests: request shapes (OpenRouter, Sarvam, self-hosted), spoken clock times, host allowlist, end-to-end voice turn, unclear note, TTS failure, spoken STOP and safety |
 
 ```
 python3 -I -m unittest discover -s tests -p "test_voice.py" -v
+VOICE=openrouter OPENROUTER_API_KEY=sk-or-... python3 -I scripts/voice_smoke.py --keep /tmp/voice   # uses credits
 ```
 
 The portal's "Try your own message" box has a 🔊 Listen button (the browser's own voices) and a 🎤 button where

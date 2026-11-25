@@ -83,6 +83,49 @@ class Backends(unittest.TestCase):
         with self.assertRaises(V.VoiceError):
             s.speak("x", "hi")
 
+    def test_openrouter_request_shapes(self):
+        seen = []
+
+        def http(url, body, headers, timeout):
+            seen.append((url, json.loads(body), headers))
+            if url.endswith("/audio/transcriptions"):
+                return 200, "application/json", json.dumps({"text": " 1 કલાક મોડું ", "language": "guj",
+                                                             "usage": {"seconds": 2.1}}).encode()
+            return 200, "audio/mpeg", MP3
+
+        s = V.OpenRouterSpeech("sk-or-x", http=http)
+        tr = s.transcribe(b"OggS..", "audio/ogg; codecs=opus")
+        self.assertEqual((tr.text, tr.speech_lang, tr.backend), ("1 કલાક મોડું", "gu-IN", "openrouter"))
+        url, body, headers = seen[0]
+        self.assertEqual(url, "https://openrouter.ai/api/v1/audio/transcriptions")
+        self.assertEqual(headers["Authorization"], "Bearer sk-or-x")
+        self.assertEqual((body["model"], body["input_audio"]["format"], body["response_format"]),
+                         ("elevenlabs/scribe-v2", "ogg", "verbose_json"))
+        self.assertEqual(base64.b64decode(body["input_audio"]["data"]), b"OggS..")
+        self.assertNotIn("language", body)                          # first message: the model detects the language
+        s.transcribe(b"x", "audio/ogg", lang_hint="mwr")
+        self.assertEqual(seen[1][1]["language"], "hi")              # ISO 639-1; Marwari through Hindi
+        self.assertEqual(s.speak("ठीक है", "pa"), (MP3, "audio/mpeg"))
+        body = seen[2][1]
+        self.assertEqual((body["model"], body["response_format"], body["input"]), ("elevenlabs/eleven-v3", "mp3", "ठीक है"))
+        self.assertEqual(body["provider"]["options"]["elevenlabs"]["language_code"], "pa")
+        self.assertNotIn("voice", body)                             # provider default unless OPENROUTER_TTS_VOICE is set
+
+    def test_openrouter_settings_and_errors(self):
+        env = {"VOICE": "openrouter", "OPENROUTER_API_KEY": "k", "OPENROUTER_STT_MODEL": "openai/whisper-large-v3",
+               "OPENROUTER_TTS_MODEL": "elevenlabs/eleven-v4", "OPENROUTER_TTS_VOICE": "v1", "OPENROUTER_DATA_COLLECTION": "deny"}
+        s = V.make_voice(env)
+        self.assertEqual((s.backend, s.stt_model, s.tts_model, s.voice, s.data_collection),
+                         ("openrouter", "openai/whisper-large-v3", "elevenlabs/eleven-v4", "v1", "deny"))
+        self.assertIsNone(V.make_voice({"VOICE": "openrouter"}))    # no key: voice stays off
+        bad = V.OpenRouterSpeech("k", http=lambda *a: (402, "application/json", b'{"error":{"code":402,"message":"Insufficient credits"}}'))
+        with self.assertRaisesRegex(V.VoiceError, "402 Insufficient credits"):
+            bad.transcribe(b"x", "audio/ogg")
+        with self.assertRaises(V.VoiceError):
+            bad.speak("x", "hi")
+        for code, want in (("hin", "hi-IN"), ("Hindi", "hi-IN"), ("mr", "mr-IN"), ("pa-IN", "pa-IN"), ("eng", "en-IN"), ("xx", None)):
+            self.assertEqual(V._bcp47(code), want, code)
+
     def test_selfhosted_shapes(self):
         seen = []
 
@@ -97,6 +140,16 @@ class Backends(unittest.TestCase):
         self.assertEqual(s.speak("ok", "gu"), (MP3, "audio/mpeg"))
         self.assertEqual(seen[0][0], "http://speech:9000/stt")
         self.assertEqual(seen[0][1]["Authorization"], "Bearer t")
+
+    def test_spoken_clock_times_become_digits(self):
+        cases = {"reaching by eleven thirty": "reaching by 11:30", "half past eleven": "11:30", "quarter to twelve": "11:45",
+                 "eleven o clock": "11:00", "साढ़े ग्यारह बजे तक": "11:30 तक", "पौने बारह बजे": "11:45", "डेढ़ बजे": "1:30",
+                 "saade gyarah baje tak": "11:30 tak", "સાડા અગિયાર વાગ્યે": "11:30", "साडे अकरा वाजता": "11:30",
+                 "ਸਾਢੇ ਗਿਆਰਾਂ ਵਜੇ ਤੱਕ": "11:30 ਤੱਕ", "11 बजे तक": "11:00 तक"}
+        for said, want in cases.items():
+            self.assertEqual(V.spoken_times(said), want, said)
+        for keep in ("एक घंटा लेट", "साढ़े तीन घंटे लेट", "do ghante late", "one thirty minutes", "1 hour late"):
+            self.assertEqual(V.spoken_times(keep), keep)              # durations are not clock times
 
     def test_spoken_text_drops_booking_codes(self):
         self.assertEqual(V.spoken("Booked D3 at 11:30 AM. Ref APT-SH-1042."), "Booked D3 at 11:30 AM. Ref .")
@@ -190,6 +243,12 @@ class EndToEnd(unittest.TestCase):
         w = self.world(FakeSpeech(heard="accident ho gaya, driver ko chot lagi hai"))
         tr = self.note(w, frm=SAFETY_PHONE)
         self.assertTrue(any(t.startswith("escalate:SAFETY") for t in tr.get("tools") or []), tr)
+
+    def test_spoken_time_in_words_is_read(self):
+        w = self.world(FakeSpeech(heard="एक घंटा लेट हूँ, साढ़े ग्यारह बजे तक पहुँचूँगा"))
+        tr = self.note(w)
+        self.assertEqual(tr["voice_in"]["normalised"], "एक घंटा लेट हूँ, 11:30 तक पहुँचूँगा")
+        self.assertEqual(tr["status"], "REPLIED")
 
     def test_spoken_stop_opts_out(self):
         w = self.world(FakeSpeech(heard="Stop."))

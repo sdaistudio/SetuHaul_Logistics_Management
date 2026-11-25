@@ -314,9 +314,12 @@ class ChannelService:
                              "ms": int((time.monotonic() - t0) * 1000), "transcript": tr.text[:300]}
         if not tr.text:
             return False
-        msg.text, msg.type, msg.voice = tr.text, "text", True
+        text = V.spoken_times(tr.text)                         # "साढ़े ग्यारह बजे" -> "11:30" (voice only)
+        if text != tr.text:
+            trace["voice_in"]["normalised"] = text[:300]
+        msg.text, msg.type, msg.voice = text, "text", True
         with write_txn(con):                                   # the log shows what was heard
-            con.execute("UPDATE wa_inbound SET body=? WHERE message_sid=?", ("[voice] " + tr.text, msg.message_id))
+            con.execute("UPDATE wa_inbound SET body=? WHERE message_sid=?", ("[voice] " + text, msg.message_id))
         return True
 
     def _speak(self, con, to, lang, reply, real, trace):
