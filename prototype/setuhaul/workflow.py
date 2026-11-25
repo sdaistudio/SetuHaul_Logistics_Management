@@ -117,7 +117,10 @@ class Session:
         self.lang = nlu.detect_lang(self.text, self.lang)
         self.x = x = nlu.extract(self.text, self.as_of)
         if x.intent == "UNKNOWN" and not x.safety and llm_fallback is not None:
-            got = llm_fallback(self.text, self.as_of, history or [])
+            if getattr(llm_fallback, "accepts_driver_key", False):
+                got = llm_fallback(self.text, self.as_of, history or [], driver_key=self.driver["driver_id"])
+            else:
+                got = llm_fallback(self.text, self.as_of, history or [])
             if got is not None:
                 self.tools.append("llm_fallback:" + got.intent)
                 self.x = x = got
