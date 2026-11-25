@@ -38,6 +38,8 @@ class InboundMessage:
     lat: Optional[float] = None
     lng: Optional[float] = None
     media_types: list = field(default_factory=list)
+    media_urls: list = field(default_factory=list)  # provider URLs of the media (Twilio: MediaUrlN, needs account auth)
+    voice: bool = False                # set by the channel service when the text came from a voice note
 
     def as_dict(self):
         return asdict(self)
@@ -53,7 +55,7 @@ class Option:
 @dataclass
 class OutboundMessage:
     to_e164: str
-    kind: str = "text"                 # text | choices | list | template
+    kind: str = "text"                 # text | choices | list | template | media (a voice reply: media_url)
     body: str = ""
     options: List[Option] = field(default_factory=list)
     template_ref: Optional[str] = None
@@ -63,6 +65,7 @@ class OutboundMessage:
     outbox_id: Optional[str] = None
     proactive: bool = False            # business-initiated: template only, whatever the window
     send_ref: Optional[str] = None     # per-attempt key, stored BEFORE the API call; travels in the status callback URL
+    media_url: Optional[str] = None    # kind=media: public https URL of the audio (served by /media/<token>)
 
     def as_dict(self):
         d = asdict(self)

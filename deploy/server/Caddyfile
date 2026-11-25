@@ -28,7 +28,8 @@
 	request_body {
 		max_size 256KB
 	}
-	@public path /webhook/twilio /webhook/twilio/status /healthz
+	# /media/* : spoken replies (VOICE on) that WhatsApp fetches; 32-hex unguessable tokens, kept 24 h
+	@public path /webhook/twilio /webhook/twilio/status /healthz /media/*
 	handle @public {
 		reverse_proxy {$UPSTREAM:app:8000}
 	}

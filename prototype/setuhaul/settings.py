@@ -30,6 +30,8 @@ class Settings:
     redis_url: str = ""
     duty_head_phone: str = ""
     worker: bool = True
+    voice: str = "off"                            # off | sarvam | selfhosted (speech models, see voice.py)
+    media_base_url: str = ""                      # public base WhatsApp fetches spoken replies from; default webhook base
 
     @classmethod
     def from_env(cls, env=None):
@@ -51,6 +53,8 @@ class Settings:
             redis_url=e.get("REDIS_URL", ""),
             duty_head_phone=e.get("DUTY_HEAD_PHONE", ""),
             worker=_b(e.get("OUTBOX_WORKER"), True),
+            voice=(e.get("VOICE") or "off").strip().lower(),
+            media_base_url=(e.get("MEDIA_BASE_URL") or e.get("TWILIO_WEBHOOK_BASE_URL") or "").rstrip("/"),
         )
 
     def public(self):
@@ -60,4 +64,4 @@ class Settings:
                 "twilio_from": mask(self.twilio_whatsapp_from), "account_sid_set": bool(self.twilio_account_sid),
                 "auth_token_set": bool(self.twilio_auth_token), "webhook_base_url": self.twilio_webhook_base_url,
                 "content_sids": sorted(self.content_sids), "template_sids": sorted(self.template_sids),
-                "clock_mode": self.clock_mode}
+                "clock_mode": self.clock_mode, "voice": self.voice, "media_base_url": self.media_base_url}

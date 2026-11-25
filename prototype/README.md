@@ -184,6 +184,43 @@ Limits: romanised Gujarati, Marathi, Punjabi or Marwari is read as Hinglish and 
 varies from district to district; the drafts follow Marwari as written around Jaipur and Jodhpur. All new reply texts need a native
 speaker's review before go-live, and each language's WhatsApp templates need separate approval.
 
+## Voice notes (VOICE=off | sarvam | selfhosted)
+
+A driver can send a WhatsApp voice note instead of typing. Speech models (not an LLM) do the listening and speaking;
+the rules engine in between is unchanged and only ever sees text.
+
+```
+voice note (OGG) -> fetch from Twilio (account auth, Twilio hosts only) -> speech-to-text in the driver's language
+  -> the transcript is the driver's message: STOP, safety words, options, the engine, the guards, all as typed
+  -> written reply with option buttons (as today) -> the same reply spoken -> /media/<token>.mp3 -> WhatsApp voice note
+```
+
+| Setting | Backend | Speech-to-text | Text-to-speech |
+|---|---|---|---|
+| `VOICE=sarvam` | Sarvam AI hosted API (`SARVAM_API_KEY`) | Saaras | Bulbul |
+| `VOICE=selfhosted` | `speech/` on our GPU box (`VOICE_SERVER_URL`) | AI4Bharat IndicConformer (MIT) + Whisper small for English | AI4Bharat Indic Parler-TTS (Apache-2.0) |
+
+Marwari and Hinglish are heard and spoken through Hindi. A first voice note is language-detected by the model;
+after that the conversation's language is the hint. If the note cannot be understood the driver gets
+"please say it again slowly, or type it" in their language; if speaking the reply fails, the written reply still goes.
+Spoken replies are kept 24 h under an unguessable token (`wa_media` table) and `MEDIA_BASE_URL` (default: the
+webhook base) must be public, so Caddy exposes `/media/*`. `/readyz` reports the voice backend when it is on.
+
+| File | Change |
+|---|---|
+| `setuhaul/voice.py` | Backends (Sarvam, self-hosted), language map, spoken-text cleanup, audio store |
+| `setuhaul/inbound.py` | Voice note -> transcript before the safety check; spoken reply after the written one |
+| `setuhaul/channels/*` | Media URLs in, `media_url` out (Twilio, simulator, console) |
+| `speech/` | Self-hosted speech server (FastAPI, Dockerfile); not run here: gated models, GPU needed |
+| `tests/test_voice.py` | 16 tests: request shapes, host allowlist, end-to-end voice turn, unclear note, TTS failure, spoken STOP and safety |
+
+```
+python3 -I -m unittest discover -s tests -p "test_voice.py" -v
+```
+
+The portal's "Try your own message" box has a 🔊 Listen button (the browser's own voices) and a 🎤 button where
+the browser allows the microphone; the claude.ai viewer blocks the microphone, so open the portal on GitHub Pages or a laptop to speak.
+
 ## What the prototype does not do
 
 * The scenario run and integrity proof make no live WhatsApp or LLM call. Where the design calls the LLM fallback and no key is set, the workflow asks the driver a clarifying question instead.
