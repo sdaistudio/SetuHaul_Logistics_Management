@@ -3,11 +3,12 @@
 Inbound: application/x-www-form-urlencoded, signed with X-Twilio-Signature (HMAC-SHA1 of the
 exact public URL + sorted POST params, keyed by the auth token). verify() uses the SDK's
 RequestValidator, which compares in constant time. Field names used (Twilio webhook reference):
-    From "whatsapp:+91...", Body, MessageSid, NumMedia, MediaContentType0, Latitude, Longitude,
+    From "whatsapp:+91...", Body, MessageSid, NumMedia, MediaContentType0, MediaUrl0, Latitude, Longitude,
     ButtonPayload / ButtonText (quick-reply tap), OriginalRepliedMessageSid (quoted reply).
     ListId / InteractiveData: read defensively; the list-picker reply field is not documented.
 Status callback: MessageSid, MessageStatus, ErrorCode, ErrorMessage, To.
-Outbound: client.messages.create(from_, to, body | content_sid + content_variables, status_callback).
+Outbound: client.messages.create(from_, to, body | content_sid + content_variables | media_url, status_callback).
+Media (voice notes): MediaUrlN is fetched with the account SID and auth token (HTTP basic), only from Twilio hosts.
 """
 import json
 import logging
@@ -88,6 +89,7 @@ class TwilioChannel:
         elif nmedia > 0:
             m.type = "media"
             m.media_types = [g(f"MediaContentType{i}") for i in range(nmedia) if g(f"MediaContentType{i}")]
+            m.media_urls = [g(f"MediaUrl{i}") for i in range(nmedia) if g(f"MediaUrl{i}")]
         elif m.text:
             m.type = "text"
         else:
@@ -110,6 +112,23 @@ class TwilioChannel:
                 out.append({"sid": m.sid, "body": m.body, "date_created": created, "status": m.status})
         return out
 
+    def fetch_media(self, url, max_bytes):
+        """Download an inbound media file (a voice note). Only https Twilio hosts; size-capped. -> (bytes, content_type)."""
+        import base64
+        import urllib.request
+        u = urlparse(url or "")
+        host = (u.hostname or "").lower()
+        if u.scheme != "https" or not (host == "api.twilio.com" or host.endswith(".twilio.com") or host.endswith(".twiliocdn.com")):
+            raise ValueError("media URL is not a Twilio https URL")
+        tok = base64.b64encode(f"{self.s.twilio_account_sid}:{self.s.twilio_auth_token}".encode()).decode()
+        req = urllib.request.Request(url, headers={"Authorization": "Basic " + tok})
+        with urllib.request.urlopen(req, timeout=10) as r:      # noqa: S310 (host checked above; redirects stay on Twilio's CDN)
+            data = r.read(max_bytes + 1)
+            ctype = r.headers.get("Content-Type", "")
+        if len(data) > max_bytes:
+            raise ValueError("media too large")
+        return data, ctype
+
     # ------------------------------------------------------------ outbound
     @property
     def client(self):
@@ -123,6 +142,11 @@ class TwilioChannel:
         p = {"from_": self.s.twilio_whatsapp_from, "to": "whatsapp:" + normalise_phone(msg.to_e164)}
         if self.s.twilio_webhook_base_url:
             p["status_callback"] = self.s.twilio_webhook_base_url + STATUS_PATH + (f"?ref={quote(msg.send_ref)}" if msg.send_ref else "")
+        if msg.kind == "media":                               # a spoken reply: the audio, no text (the text went just before)
+            if not msg.media_url:
+                raise LookupError("media message without media_url")
+            p["media_url"] = [msg.media_url]
+            return p
         if msg.kind == "template":
             sid = self.s.template_sids.get(msg.template_ref or "")
             if not sid:
@@ -167,6 +191,8 @@ class TwilioChannel:
 
 
 def sent_kind(params, msg):
+    if "media_url" in params:
+        return "media"
     if "content_sid" not in params:
         return "text"
     return "template" if msg.kind == "template" else "interactive"

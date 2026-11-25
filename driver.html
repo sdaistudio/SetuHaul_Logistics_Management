@@ -133,6 +133,11 @@
 .trybtns button{border:1px solid #9fc9b8;background:#f4fbf7;color:#0B5C4F;border-radius:10px;padding:7px 10px;font-weight:600;font-size:12.5px;min-height:36px}
 .trybtns button:hover{background:#e3f4ec}
 .trycomp{display:flex;gap:8px;padding:10px;background:#f0f0f0;border-top:1px solid var(--line)}
+.trysay{border:0;background:transparent;color:#0B5C4F;font-size:12px;font-weight:600;padding:4px 0 0;cursor:pointer;display:block}
+.trysay:hover{text-decoration:underline}
+#trymic{border:0;border-radius:50%;width:44px;height:44px;background:#fff;border:1px solid var(--line2);font-size:18px;cursor:pointer}
+#trymic.on{background:#e8453c;color:#fff;border-color:#e8453c;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
 .trycomp textarea{flex:1;resize:none;font:inherit;font-size:16px;line-height:1.35;padding:10px 12px;border-radius:20px;border:1px solid var(--line2);background:#fff;color:#1b2430;min-height:44px;max-height:120px}
 .trycomp button{width:46px;height:46px;border-radius:50%;border:0;background:#0B8A78;color:#fff;font-size:18px;flex:none}
 .trycomp button:disabled{background:#9aa6b2}
@@ -211,20 +216,22 @@
    <div class="trytrips" id="trytrips"></div>
    <label for="trytime">Time on 4 August</label>
    <input type="time" id="trytime" value="09:19" min="08:20" max="22:00" step="60" disabled>
+   <label for="tryvlang">Voice language (🎤 and 🔊)</label>
+   <select id="tryvlang"><option value="auto">Same as the last reply</option><option value="hi">Hindi</option><option value="en">English</option><option value="hi-Latn">Hinglish</option><option value="gu">Gujarati</option><option value="mr">Marathi</option><option value="pa">Punjabi</option><option value="mwr">Marwari (through Hindi)</option></select>
    <label>Sample messages</label>
    <div class="trysamples" id="trysamples"></div>
   </div>
   <div class="trychat">
    <h4><span id="tryname">SetuHaul Dispatch · Jaipur DC</span><small id="trybadge">engine not started</small></h4>
    <div id="trylog"><div class="tryempty" id="tryempty"><p>The engine is about 12 MB and loads only when you start it (a few seconds, once per visit).</p><button class="btn pri" id="trystart">Start the engine</button></div></div>
-   <form class="trycomp" id="tryform"><textarea id="trytext" rows="1" placeholder="Type a message as the driver" aria-label="Message" disabled></textarea><button id="trysend" aria-label="Send" disabled>➤</button></form>
+   <form class="trycomp" id="tryform"><textarea id="trytext" rows="1" placeholder="Type a message as the driver" aria-label="Message" disabled></textarea><button type="button" id="trymic" aria-label="Speak your message" title="Speak (voice to text)" disabled>🎤</button><button id="trysend" aria-label="Send" disabled>➤</button></form>
   </div>
   <div class="card tryside">
    <h3>Behind the last reply</h3>
    <dl class="trykv"><dt>State</dt><dd id="trystate">—</dd><dt>Language read</dt><dd id="trylang">—</dd><dt>Trip</dt><dd id="tryship">—</dd></dl>
    <h3>What the engine checked</h3>
    <ul class="trytools" id="trytools"><li>Send a message to see each check.</li></ul>
-   <p class="trynote">Rules only, as in the morning replay: no AI model is called, so a message the rules cannot read gets a clarifying question. The yard starts as it stood at 08:20; the morning's later events (the D3 breakdown, other trucks arriving) are not replayed here. Time only moves forward. <button class="btn ghost" id="tryreset" style="margin-top:8px" disabled>↺ Reset all drivers</button></p>
+   <p class="trynote">Rules only, as in the morning replay: no AI model is called, so a message the rules cannot read gets a clarifying question. The yard starts as it stood at 08:20; the morning's later events (the D3 breakdown, other trucks arriving) are not replayed here. Time only moves forward. Voice here uses your browser's own speech; on WhatsApp the server uses dedicated speech models (see README, VOICE). <button class="btn ghost" id="tryreset" style="margin-top:8px" disabled>↺ Reset all drivers</button></p>
    <p class="trystatus" id="trystatus" role="status"></p>
   </div>
  </div>
@@ -506,7 +513,7 @@ addEventListener('hashchange',route);route();
   drivers = r.drivers; logs = {}; last = {};
   $t('trydrv').innerHTML = drivers.map(d => `<option value="${d.driver_id}">${esc(d.name)} · ${d.driver_id}</option>`).join('');
   $t('trydrv').value = drivers.some(d => d.driver_id === 'DRV013') ? 'DRV013' : drivers[0].driver_id;
-  for (const id of ['trydrv', 'trytime', 'trytext', 'trysend', 'tryreset']) $t(id).disabled = false;
+  for (const id of ['trydrv', 'trytime', 'trytext', 'trysend', 'tryreset', 'trymic']) $t(id).disabled = false;
   $t('trytime').value = '09:19'; $t('trytime').min = r.start;
   $t('trybadge').textContent = 'engine running · ' + (r.guards === 'ok' ? 'booking guards ok' : 'check guards');
   showDriver(); $t('trytext').focus();
@@ -533,6 +540,38 @@ addEventListener('hashchange',route);route();
   $t('trytools').innerHTML = r && r.tools.length ? r.tools.map(x => `<li>${esc(x)}</li>`).join('') : '<li>Send a message to see each check.</li>';
  }
 
+ // ---- voice: browser speech for the demo (the WhatsApp server uses speech models, see setuhaul/voice.py)
+ const BCP = { en: 'en-IN', 'hi-Latn': 'en-IN', hi: 'hi-IN', gu: 'gu-IN', mr: 'mr-IN', pa: 'pa-IN', mwr: 'hi-IN' };
+ const SAY = [];
+ function vlang(fallback) { const v = $t('tryvlang').value; return v === 'auto' ? (fallback || (last[$t('trydrv').value] || {}).lang || 'hi') : v; }
+ function say(text, lang) {
+  if (!('speechSynthesis' in window)) { status('This browser cannot speak text aloud.', true); return; }
+  const tag = BCP[vlang(lang)] || 'hi-IN', voices = speechSynthesis.getVoices();
+  const u = new SpeechSynthesisUtterance(text.replace(/\bAPT-[A-Z0-9-]+\b/g, ''));
+  const v = voices.find(x => x.lang === tag) || voices.find(x => x.lang.startsWith(tag.slice(0, 2)))
+         || (tag !== 'en-IN' && voices.find(x => x.lang === 'hi-IN'));
+  if (v) u.voice = v; u.lang = v ? v.lang : tag; u.rate = 0.95;
+  if (!v || v.lang !== tag) status(`No ${tag} voice in this browser${v ? ', reading it with ' + v.lang : ''}. On WhatsApp the server speaks every language.`);
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+ }
+ let rec = null, spoke = false;
+ function mic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { status('This browser has no speech recognition (Chrome or Edge do). On WhatsApp, drivers simply send a voice note.', true); return; }
+  if (rec) { rec.stop(); return; }
+  rec = new SR(); rec.lang = BCP[vlang()] === 'en-IN' && vlang() === 'hi-Latn' ? 'hi-IN' : (BCP[vlang()] || 'hi-IN');
+  rec.interimResults = true; rec.maxAlternatives = 1;
+  $t('trymic').classList.add('on'); status('Listening (' + rec.lang + ')… speak, then pause.');
+  rec.onresult = e => { const x = [...e.results].map(r => r[0].transcript).join(' '); $t('trytext').value = x;
+                        if (e.results[e.results.length - 1].isFinal) { spoke = true; } };
+  rec.onerror = e => status(e.error === 'not-allowed' || e.error === 'service-not-allowed'
+     ? 'The microphone is blocked here (the claude.ai viewer does not allow it). Open the portal on GitHub Pages or a laptop to speak, or type.'
+     : 'Voice input stopped: ' + e.error, true);
+  rec.onend = async () => { $t('trymic').classList.remove('on'); rec = null;
+     if (spoke && $t('trytext').value.trim()) { status('Heard: ' + $t('trytext').value); await send($t('trytext').value); } spoke = false; };
+  try { rec.start(); } catch (e) { rec = null; $t('trymic').classList.remove('on'); status('Voice input could not start: ' + e.message, true); }
+ }
+
  async function send(text) {
   text = (text || '').trim(); if (!text) return;
   if (!pg) { await boot(); if (!pg) return; }
@@ -541,11 +580,13 @@ addEventListener('hashchange',route);route();
   try { r = JSON.parse(pg.send(id, text, hhmm)); }
   catch (e) { status('The engine raised an error: ' + String(e.message || e).split('\n').slice(-2).join(' '), true); return; }
   const L = logs[id] = logs[id] || [];
-  L.push(`<div class="msg me ${scr(text)}">${esc(text)}<span class="tm">${r.time} ✓✓</span></div>`);
+  L.push(`<div class="msg me ${scr(text)}">${spoke ? '🎤 ' : ''}${esc(text)}<span class="tm">${r.time} ✓✓</span></div>`);
   const btns = r.buttons.length ? `<div class="trybtns">${r.buttons.map((b, i) => `<button type="button" data-pick="${i + 1}">${i + 1} · ${esc(b)}</button>`).join('')}</div>` : '';
-  L.push(`<div class="msg bot ${scr(r.reply)}">${esc(r.reply)}${btns}<span class="tm">${r.time}</span></div>`);
+  const si = SAY.push([r.reply, r.lang]) - 1;
+  L.push(`<div class="msg bot ${scr(r.reply)}">${esc(r.reply)}${btns}<button type="button" class="trysay" data-say="${si}">🔊 Listen</button><span class="tm">${r.time}</span></div>`);
   last[id] = r; $t('trytime').value = r.time; $t('trytime').min = r.time;
   $t('trytext').value = ''; showDriver();
+  if (spoke) say(r.reply, r.lang);                  // they spoke, so the answer is spoken too
  }
 
  $t('trysamples').innerHTML = SAMPLES.map(([l, s]) => `<button type="button" class="s-${scr(s)}" title="${l}">${esc(s)}</button>`).join('');
@@ -554,7 +595,10 @@ addEventListener('hashchange',route);route();
  $t('trydrv').onchange = showDriver;
  $t('tryform').onsubmit = e => { e.preventDefault(); send($t('trytext').value); };
  $t('trytext').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($t('trytext').value); } };
- $t('trylog').onclick = e => { const b = e.target.closest('[data-pick]'); if (b) send(b.dataset.pick); };
+ $t('trylog').onclick = e => { const s = e.target.closest('[data-say]'); if (s) { const [x, l] = SAY[+s.dataset.say]; say(x, l); return; }
+                              const b = e.target.closest('[data-pick]'); if (b) send(b.dataset.pick); };
+ $t('trymic').onclick = mic;
+ if ('speechSynthesis' in window) speechSynthesis.getVoices();     // voices load asynchronously
  $t('tryreset').onclick = () => { if (pg) { start(JSON.parse(pg.reset())); status('Reset: every driver back to 08:20.'); } };
 }
 </script>

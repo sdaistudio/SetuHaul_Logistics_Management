@@ -6,7 +6,7 @@
 # (The AWS CLI on macOS cannot read --cli-input-json from /dev/stdin.)
 #
 #   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN      required
-#   ANTHROPIC_API_KEY, LANGSMITH_API_KEY       optional (press Enter to skip / keep the current value)
+#   ANTHROPIC_API_KEY, LANGSMITH_API_KEY, SARVAM_API_KEY, VOICE_SERVER_TOKEN   optional (press Enter to skip / keep the current value)
 #   DEMO_PHONE                                 optional, personal data: your one WhatsApp number (+91XXXXXXXXXX) for
 #                                              reset-demo.sh C03|C06|C07|C12|C14
 #   DEMO_PHONES                                optional, personal data: several handsets, e.g. DRV013=+91...,CON003=+91...
@@ -16,7 +16,7 @@
 check_aws
 
 step "SSM SecureString parameters under $PARAM_PATH/"
-cost "SecureString parameters $PARAM_PATH/{TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN,ANTHROPIC_API_KEY,LANGSMITH_API_KEY,DEMO_PHONE,DEMO_PHONES,SETUHAUL_DEV_SECRET}" \
+cost "SecureString parameters $PARAM_PATH/{TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN,ANTHROPIC_API_KEY,LANGSMITH_API_KEY,SARVAM_API_KEY,VOICE_SERVER_TOKEN,DEMO_PHONE,DEMO_PHONES,SETUHAUL_DEV_SECRET}" \
      "US\$0.00/month (standard parameters and the aws/ssm managed key are free)"
 if [ "$DRY_RUN" = 1 ]; then say "  [dry-run] would prompt for each value with hidden input and store it"; exit 0; fi
 confirm
@@ -50,6 +50,8 @@ ask TWILIO_ACCOUNT_SID 1
 ask TWILIO_AUTH_TOKEN 1
 ask ANTHROPIC_API_KEY 0
 ask LANGSMITH_API_KEY 0
+ask SARVAM_API_KEY 0
+ask VOICE_SERVER_TOKEN 0
 ask DEMO_PHONE 0
 ask DEMO_PHONES 0
 if ! exists "$PARAM_PATH/SETUHAUL_DEV_SECRET"; then
